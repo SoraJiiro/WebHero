@@ -1,18 +1,3 @@
-export function encodeMidi(buffer) {
-  const bytes = new Uint8Array(buffer);
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  }
-  return btoa(binary);
-}
-
-export function decodeMidi(base64) {
-  const binary = atob(base64);
-  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-  return bytes.buffer;
-}
-
 export function loadKeys(storage, settingKey, defaults) {
   try {
     const saved = JSON.parse(storage.getItem(settingKey));
@@ -38,6 +23,66 @@ export function selectChartTrack(chart, difficulty, difficultyOrder) {
   return { difficulty: trackDifficulty, track };
 }
 
+// Un même périphérique peut apparaître en double (XInput + HID) : on n'en lit qu'un.
+export function pickPad(pads) {
+  const list = [...pads].filter(Boolean);
+  return list.find((p) => p.mapping === "standard") ?? list[0];
+}
+
+export function getPressedPadButtons(pads) {
+  const down = new Set();
+  pickPad(pads)?.buttons.forEach((b, i) => b.pressed && down.add(i));
+  return down;
+}
+
+// Une lane est active si tous ses boutons sont pressés, sauf si une lane plus spécifique (sur-ensemble) l'est aussi.
+export function getActivePadLanes(padButtons, down) {
+  const sets = padButtons.map((b) => [].concat(b));
+  const on = sets.map((s) => s.length > 0 && s.every((b) => down.has(b)));
+  return sets.flatMap((s, lane) =>
+    on[lane] &&
+    !sets.some(
+      (o, m) => on[m] && o.length > s.length && s.every((b) => o.includes(b)),
+    )
+      ? [lane]
+      : [],
+  );
+}
+
+export function diffPadLanes(padButtons, down, heldLanes) {
+  const active = new Set(getActivePadLanes(padButtons, down));
+  const press = [...active].filter((lane) => !heldLanes.has(lane));
+  const releaseLanes = [...heldLanes].filter((lane) => !active.has(lane));
+  return { press, releaseLanes };
+}
+
+export const GUITAR_WINDOW = 150;
+
+export function findGuitarGroup(notes, now, window = GUITAR_WINDOW) {
+  const open = notes.filter((n) => !n.hitRegistered && !n.missed);
+  let target;
+  for (const n of open) {
+    const d = Math.abs(now - n.hitAt);
+    if (d <= window && (!target || d < Math.abs(now - target.hitAt)))
+      target = n;
+  }
+  if (!target) return null;
+  const group = open.filter((n) => Math.abs(n.hitAt - target.hitAt) < 1);
+  return { notes: group, lanes: group.map((n) => n.lane), type: target.type };
+}
+
+// Une ancre plus basse est tolérée : seule la frette la plus haute doit coïncider.
+export function fretsMatch(lanes, held) {
+  return (
+    Math.max(...held, -1) === Math.max(...lanes) &&
+    lanes.every((lane) => held.includes(lane))
+  );
+}
+
+export function canFretHit(type, combo) {
+  return type === "tap" || (type === "hopo" && combo > 0);
+}
+
 export function getHoldTapLanes(targetLane, heldLanes, laneRanks) {
   return [
     targetLane,
@@ -59,7 +104,8 @@ export function findHitNote(notes, lanes, now, earlyWindow = 280) {
       lanePriority < 0 ||
       now < note.hitAt - earlyWindow ||
       now > note.missAt
-    ) continue;
+    )
+      continue;
     const distance = Math.abs(now - note.hitAt);
     if (
       distance < bestDistance ||

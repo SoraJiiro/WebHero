@@ -1,3 +1,49 @@
+export function classifyNotes(notes, hopoTicks) {
+  const groups = Map.groupBy(notes, (note) => note.tick);
+  let prev;
+  for (const group of groups.values()) {
+    const lanes = group.map((note) => note.lane);
+    const first = group[0];
+    const natural =
+      group.length === 1 &&
+      prev &&
+      first.tick - prev.tick <= hopoTicks &&
+      !prev.lanes.includes(first.lane);
+    let type = "strum";
+    if (group.some((note) => note.tap)) type = "tap";
+    else if (first.force) type = first.force;
+    else if (group.length === 1 && prev && natural !== !!first.toggle)
+      type = "hopo";
+    for (const note of group) note.type = type;
+    prev = { tick: first.tick, lanes };
+  }
+}
+
+// Marqueurs de paroles Rock Band/Clone Hero (# ^ * % $ § + /) ; '=' relie deux syllabes.
+// Un battement par temps ; on suppose du 4/4 pour marquer les mesures.
+export function buildBeats(timeAtTick, ticksPerBeat, endTime) {
+  const beats = [];
+  for (let i = 0; ; i++) {
+    const time = timeAtTick(i * ticksPerBeat);
+    if (time > endTime) return beats;
+    beats.push({ time, strong: i % 4 === 0 });
+  }
+}
+
+export function scheduleWebHeroBeats(beats, startAt, chartSpeed) {
+  return beats.map(({ time, strong }) => ({
+    hitAt: startAt + (time / chartSpeed) * 1000,
+    strong,
+  }));
+}
+
+export function cleanLyric(text) {
+  return text
+    .replace(/[#^*%$§+/]/g, "")
+    .replace(/=/g, "-")
+    .trim();
+}
+
 export function parseWebHeroChart(text) {
   if (typeof text !== "string") throw new Error("Fichier .chart invalide.");
 
@@ -47,24 +93,32 @@ export function parseWebHeroChart(text) {
     const match = name.match(/^(easy|medium|hard|expert)(single)?$/);
     if (!match) continue;
     const difficulty = match[1];
-    const notes = [...body.matchAll(/^\s*(\d+)\s*=\s*N\s+([0-7])\s+(\d+)/gm)]
-      .map(([, tick, lane, length]) => ({
+    const raw = [...body.matchAll(/^\s*(\d+)\s*=\s*N\s+([0-7])\s+(\d+)/gm)].map(
+      ([, tick, lane, length]) => ({
         tick: Number(tick),
         lane: Number(lane),
         length: Number(length),
-      }))
+      }),
+    );
+    // N 5 = forced (inverse du HOPO naturel), N 6 = tap
+    const toggles = new Set(raw.filter((n) => n.lane === 5).map((n) => n.tick));
+    const taps = new Set(raw.filter((n) => n.lane === 6).map((n) => n.tick));
+    const notes = raw
       .filter(({ lane }) => lane <= 4 || lane === 7)
       .sort((a, b) => a.tick - b.tick || a.lane - b.lane);
     if (!notes.length || (tracks[difficulty] && !match[2])) continue;
 
     for (const note of notes) {
       note.time = timeAtTick(note.tick);
-      note.sustain = Math.max(
-        0,
-        timeAtTick(note.tick + note.length) - note.time,
-      );
+      note.sustain =
+        note.length > resolution / 3
+          ? Math.max(0, timeAtTick(note.tick + note.length) - note.time)
+          : 0;
       if (note.lane === 7) note.lane = 0;
+      note.toggle = toggles.has(note.tick);
+      note.tap = taps.has(note.tick);
     }
+    classifyNotes(notes, (resolution * 65) / 192);
     tracks[difficulty] = {
       name: match[2] ? `${match[1]}Single` : match[1],
       notes,
@@ -85,10 +139,18 @@ export function parseWebHeroChart(text) {
     .map(([, tick, text]) => ({
       tick: Number(tick),
       time: timeAtTick(Number(tick)),
-      text: text.replace(/\\"/g, '"').trim(),
+      text: cleanLyric(text.replace(/\\"/g, '"')),
     }))
     .filter(({ text }) => text);
-  return { tracks, lyrics };
+  return {
+    tracks,
+    lyrics,
+    beats: buildBeats(
+      timeAtTick,
+      resolution,
+      Math.max(...Object.values(tracks).map((track) => track.duration)),
+    ),
+  };
 }
 
 export function parseWebHeroMidi(input) {
@@ -170,7 +232,7 @@ export function parseWebHeroMidi(input) {
           if (!microseconds) throw new Error("Tempo MIDI invalide.");
           tempos.push({ tick, order: eventOrder++, microseconds });
         } else if (type === 0x05) {
-          const text = readMetaText(length).trim();
+          const text = cleanLyric(readMetaText(length));
           if (text) lyrics.push({ tick, text, order: eventOrder++ });
         }
         offset += length;
@@ -267,6 +329,11 @@ export function parseWebHeroMidi(input) {
   const playableTracks = {};
   for (const [difficulty, base] of difficultyBases) {
     const chartNotes = [];
+    // Marqueurs MIDI : base+5 = HOPO forcé, base+6 = strum forcé, 104 = tap
+    const inMarker = (pitch, tick) =>
+      instrument.notes.some(
+        (m) => m.pitch === pitch && tick >= m.start && tick < m.end,
+      );
     for (const note of instrument.notes) {
       const lane = note.pitch - base;
       if (lane < 0 || lane > 4) continue;
@@ -274,11 +341,22 @@ export function parseWebHeroMidi(input) {
       chartNotes.push({
         lane,
         time,
-        sustain: Math.max(0, timeAtTick(note.end) - time),
+        tick: note.start,
+        sustain:
+          note.end - note.start > division / 3
+            ? Math.max(0, timeAtTick(note.end) - time)
+            : 0,
+        tap: inMarker(104, note.start),
+        force: inMarker(base + 5, note.start)
+          ? "hopo"
+          : inMarker(base + 6, note.start)
+            ? "strum"
+            : undefined,
       });
     }
     if (chartNotes.length) {
       chartNotes.sort((a, b) => a.time - b.time || a.lane - b.lane);
+      classifyNotes(chartNotes, (division * 65) / 192);
       playableTracks[difficulty] = {
         name: difficulty,
         notes: chartNotes,
@@ -290,6 +368,7 @@ export function parseWebHeroMidi(input) {
     throw new Error("Le MIDI ne contient aucune note jouable Guitar Hero.");
   return {
     tracks: playableTracks,
+    beats: buildBeats(timeAtTick, division, timeAtTick(maxTick)),
     lyrics: lyrics
       .sort((a, b) => a.tick - b.tick || a.order - b.order)
       .map(({ tick, text }) => ({ time: timeAtTick(tick), text })),
@@ -302,6 +381,7 @@ export function scheduleWebHeroTrack(track, startAt, travelTime, chartSpeed) {
     duration: track.duration / chartSpeed,
     notes: track.notes.map((note) => ({
       lane: note.lane,
+      type: note.type,
       spawnAt: startAt + (note.time / chartSpeed) * 1000 - travelTime,
       travelTime,
       sustain: note.sustain / chartSpeed,

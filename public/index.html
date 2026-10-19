@@ -63,6 +63,12 @@
         </div>
       </header>
 
+      <span id="web-hero-status" role="status"><span
+          id="web-hero-status-text">Importe une chart pour
+          commencer.</span><progress id="web-hero-import-progress" max="1"
+          value="0" hidden
+          aria-label="Progression du chargement"></progress></span>
+
       <main id="game-area" class="arena-shell" aria-label="Jeu WebHero"
         tabindex="-1">
         <div class="web-hero-wrap">
@@ -71,12 +77,10 @@
             aria-describedby="web-hero-instructions">Votre navigateur ne prend
             pas en charge le canvas.</canvas>
           <div class="arena-idle" aria-hidden="true">
-            <span class="idle-eyebrow">WEBHERO · PRÊT À JOUER</span>
-            <span class="idle-title">À TOI DE JOUER<span>.</span></span>
+            <span class="idle-title">À TOI DE JOUER<span>!</span></span>
             <span class="idle-caption">Importe le dossier d’une chart, puis
               lance la partie.</span>
-            <span
-              class="idle-signal"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+            <img class="idle-logo" src="./assets/imgs/WH-LOGO.svg" alt />
           </div>
           <p id="web-hero-instructions" class="visually-hidden">Choisissez une
             chart et une difficulté, puis appuyez sur Jouer. Appuyez sur les
@@ -84,6 +88,26 @@
             frappe, ou utilisez les boutons tactiles.</p>
           <div id="web-hero-lyrics" class="lyrics" aria-live="polite"
             hidden></div>
+          <section id="web-hero-pause" class="game-over" role="dialog"
+            aria-labelledby="web-hero-pause-title" hidden>
+            <div class="game-over-card">
+              <div class="result-heading">
+                <span id="web-hero-pause-kicker">ÉCHAP pour reprendre · START
+                  sur la manette</span>
+                <h2 id="web-hero-pause-title">PAUSE</h2>
+              </div>
+              <button id="web-hero-resume" class="result-replay" type="button"
+                aria-label="Reprendre la partie">
+                <span>Reprendre</span><i class="fa-solid fa-play"
+                  aria-hidden="true"></i>
+              </button>
+              <button id="web-hero-quit" class="result-return" type="button"
+                aria-label="Abandonner la partie">
+                <i class="fa-solid fa-stop"
+                  aria-hidden="true"></i><span>Abandonner la partie</span>
+              </button>
+            </div>
+          </section>
           <section id="web-hero-game-over" class="game-over" role="dialog"
             aria-labelledby="web-hero-result-title" hidden>
             <div class="game-over-card">
@@ -145,59 +169,181 @@
       </main>
 
       <footer class="bottom-bar">
-        <div class="settings-row">
-          <span class="footer-section-label"><i class="fa-solid fa-sliders"
-              aria-hidden="true"></i> Réglages</span>
-          <label class="speed-control">
-            <span><i class="fa-solid fa-gauge-high" aria-hidden="true"></i>
-              Vitesse</span>
-            <input id="web-hero-chart-speed" type="range" min="0.5" max="1"
-              step="0.05" value="0.75"
-              aria-label="Vitesse de lecture de la chart"
-              aria-describedby="web-hero-chart-speed-value"
-              title="Régler la vitesse de lecture" />
-            <output id="web-hero-chart-speed-value"
-              for="web-hero-chart-speed">75 %</output>
-          </label>
-          <label class="speed-control">
-            <span><i class="fa-solid fa-bolt" aria-hidden="true"></i>
-              Hyperspeed</span>
-            <input id="web-hero-hyperspeed" type="range" min="0.8" max="2.5"
-              step="0.1" value="1.5"
-              aria-label="Hyperspeed, espacement visuel des notes"
-              aria-describedby="web-hero-hyperspeed-value"
-              title="Régler l’espacement visuel des notes" />
-            <output id="web-hero-hyperspeed-value"
-              for="web-hero-hyperspeed">1.5×</output>
-          </label>
-          <span id="web-hero-status" role="status"><span
-              id="web-hero-status-text">Importe une chart pour
-              commencer.</span></span>
-        </div>
-        <div class="key-row" role="group"
-          aria-label="Configuration des touches de jeu">
-          <span class="footer-section-label"><i class="fa-regular fa-keyboard"
-              aria-hidden="true"></i> Touches</span>
-          <label><span class="lane lane-0" aria-hidden="true">●</span><input
-              class="web-hero-key" value="D" maxlength="1"
-              aria-label="Touche de jeu pour la lane rouge"
-              title="Modifier la touche de la lane rouge" /></label>
-          <label><span class="lane lane-1" aria-hidden="true">●</span><input
-              class="web-hero-key" value="F" maxlength="1"
-              aria-label="Touche de jeu pour la lane orange"
-              title="Modifier la touche de la lane orange" /></label>
-          <label><span class="lane lane-2" aria-hidden="true">●</span><input
-              class="web-hero-key" value="J" maxlength="1"
-              aria-label="Touche de jeu pour la lane jaune"
-              title="Modifier la touche de la lane jaune" /></label>
-          <label><span class="lane lane-3" aria-hidden="true">●</span><input
-              class="web-hero-key" value="K" maxlength="1"
-              aria-label="Touche de jeu pour la lane verte"
-              title="Modifier la touche de la lane verte" /></label>
-          <label><span class="lane lane-4" aria-hidden="true">●</span><input
-              class="web-hero-key" value="L" maxlength="1"
-              aria-label="Touche de jeu pour la lane bleue"
-              title="Modifier la touche de la lane bleue" /></label>
+        <div class="settings-grid">
+          <section class="settings-panel" aria-label="Réglages de jeu">
+            <div class="panel-head"><span class="footer-section-label"><i
+                  class="fa-solid fa-sliders"
+                  aria-hidden="true"></i> Jeu</span></div>
+            <div class="panel-body">
+              <label class="speed-control">
+                <span><i class="fa-solid fa-gauge-high" aria-hidden="true"></i>
+                  <span class="speed-label-full">Vitesse</span><span
+                    class="speed-label-short"
+                    aria-hidden="true">Vit.</span></span>
+                <input id="web-hero-chart-speed" type="range" min="0.5" max="1"
+                  step="0.05" value="0.75"
+                  aria-label="Vitesse de lecture de la chart"
+                  aria-describedby="web-hero-chart-speed-value"
+                  title="Régler la vitesse de lecture" />
+                <output id="web-hero-chart-speed-value"
+                  for="web-hero-chart-speed">75 %</output>
+              </label>
+              <label class="speed-control"
+                aria-label="Vitesse de défilement des notes"
+                title="Vitesse de défilement des notes">
+                <span><i class="fa-solid fa-bolt" aria-hidden="true"></i>
+                  <span class="speed-label-full">Hyperspeed</span><span
+                    class="speed-label-short"
+                    aria-hidden="true">Hyper.</span></span>
+                <input id="web-hero-hyperspeed" type="range" min="0.8" max="2.5"
+                  step="0.1" value="1.5"
+                  aria-label="Vitesse de défilement des notes"
+                  aria-describedby="web-hero-hyperspeed-value"
+                  title="Vitesse de défilement des notes" />
+                <output id="web-hero-hyperspeed-value"
+                  for="web-hero-hyperspeed">1.5×</output>
+              </label>
+              <label class="speed-control nofail"
+                title="Pas de stage presence ni de game over ; score non enregistré">
+                <input id="web-hero-nofail" type="checkbox" />
+                <span><i class="fa-solid fa-shield-halved"
+                    aria-hidden="true"></i>
+                  No-Fail Mode</span>
+              </label>
+            </div>
+          </section>
+          <section class="settings-panel" aria-label="Calibration">
+            <div class="panel-head"><span class="footer-section-label"><i
+                  class="fa-solid fa-sliders"
+                  aria-hidden="true"></i> Calibration</span></div>
+            <div class="panel-body">
+              <label class="speed-control"
+                title="Négatif : musique plus tôt (compense un audio en retard, ex. Bluetooth)">
+                <span><i class="fa-solid fa-volume-high" aria-hidden="true"></i>
+                  <span class="speed-label-full">Délai audio</span><span
+                    class="speed-label-short"
+                    aria-hidden="true">Aud.</span></span>
+                <input id="web-hero-audio-delay" type="range" min="-300"
+                  max="300"
+                  step="5" value="0" aria-label="Délai audio en millisecondes"
+                  aria-describedby="web-hero-audio-delay-value" />
+                <output id="web-hero-audio-delay-value"
+                  for="web-hero-audio-delay">0 ms</output>
+              </label>
+              <label class="speed-control"
+                title="Positif : notes affichées plus tôt (compense un écran en retard)">
+                <span><i class="fa-solid fa-tv" aria-hidden="true"></i>
+                  <span class="speed-label-full">Délai vidéo</span><span
+                    class="speed-label-short"
+                    aria-hidden="true">Vid.</span></span>
+                <input id="web-hero-video-delay" type="range" min="-300"
+                  max="300"
+                  step="5" value="0" aria-label="Délai vidéo en millisecondes"
+                  aria-describedby="web-hero-video-delay-value" />
+                <output id="web-hero-video-delay-value"
+                  for="web-hero-video-delay">0 ms</output>
+              </label>
+            </div>
+          </section>
+          <section class="settings-panel key-row" role="group"
+            aria-label="Configuration de la manette">
+            <div class="panel-head">
+              <span class="footer-section-label"><i class="fa-solid fa-gamepad"
+                  aria-hidden="true"></i> Manette</span>
+              <output id="web-hero-pad-debug" class="footer-section-label"
+                title="Boutons et axes détectés"></output>
+            </div>
+            <div class="panel-body key-grid">
+              <label><span class="lane lane-0"
+                  aria-hidden="true">●</span><button
+                  class="web-hero-pad" type="button"
+                  title="Cliquer puis appuyer sur un bouton de la manette"></button></label>
+              <label><span class="lane lane-1"
+                  aria-hidden="true">●</span><button
+                  class="web-hero-pad" type="button"
+                  title="Cliquer puis appuyer sur un bouton de la manette"></button></label>
+              <label><span class="lane lane-2"
+                  aria-hidden="true">●</span><button
+                  class="web-hero-pad" type="button"
+                  title="Cliquer puis appuyer sur un bouton de la manette"></button></label>
+              <label><span class="lane lane-3"
+                  aria-hidden="true">●</span><button
+                  class="web-hero-pad" type="button"
+                  title="Cliquer puis appuyer sur un bouton de la manette"></button></label>
+              <label><span class="lane lane-4"
+                  aria-hidden="true">●</span><button
+                  class="web-hero-pad" type="button"
+                  title="Cliquer puis appuyer sur un bouton de la manette"></button></label>
+              <label class="pause-map" title="Bouton de pause"><i
+                  class="fa-solid fa-pause" aria-hidden="true"></i><button
+                  class="web-hero-pad" type="button"
+                  aria-label="Bouton de pause de la manette"
+                  title="Cliquer puis appuyer sur un bouton de la manette"></button></label>
+              <label class="pause-map" title="Strum haut"><i
+                  class="fa-solid fa-arrow-up" aria-hidden="true"></i><button
+                  class="web-hero-pad" type="button"
+                  aria-label="Bouton de strum haut de la manette"
+                  title="Cliquer puis appuyer sur un bouton de la manette"></button></label>
+              <label class="pause-map" title="Strum bas"><i
+                  class="fa-solid fa-arrow-down" aria-hidden="true"></i><button
+                  class="web-hero-pad" type="button"
+                  aria-label="Bouton de strum bas de la manette"
+                  title="Cliquer puis appuyer sur un bouton de la manette"></button></label>
+            </div>
+          </section>
+          <section class="settings-panel key-row" role="group"
+            aria-label="Configuration des touches de jeu">
+            <div class="panel-head"><span class="footer-section-label"><i
+                  class="fa-regular fa-keyboard"
+                  aria-hidden="true"></i> Clavier</span></div>
+            <div class="panel-body key-grid">
+              <label><span class="lane lane-0"
+                  aria-hidden="true">●</span><button
+                  class="web-hero-key" type="button"
+                  aria-label="Touche de jeu pour la lane rouge"
+                  title="Cliquer puis appuyer sur une touche">D</button></label>
+              <label><span class="lane lane-1"
+                  aria-hidden="true">●</span><button
+                  class="web-hero-key" type="button"
+                  aria-label="Touche de jeu pour la lane orange"
+                  title="Cliquer puis appuyer sur une touche">F</button></label>
+              <label><span class="lane lane-2"
+                  aria-hidden="true">●</span><button
+                  class="web-hero-key" type="button"
+                  aria-label="Touche de jeu pour la lane jaune"
+                  title="Cliquer puis appuyer sur une touche">J</button></label>
+              <label><span class="lane lane-3"
+                  aria-hidden="true">●</span><button
+                  class="web-hero-key" type="button"
+                  aria-label="Touche de jeu pour la lane verte"
+                  title="Cliquer puis appuyer sur une touche">K</button></label>
+              <label><span class="lane lane-4"
+                  aria-hidden="true">●</span><button
+                  class="web-hero-key" type="button"
+                  aria-label="Touche de jeu pour la lane bleue"
+                  title="Cliquer puis appuyer sur une touche">L</button></label>
+              <label class="pause-map" title="Touche de pause"><i
+                  class="fa-solid fa-pause" aria-hidden="true"></i><button
+                  id="web-hero-pause-key" type="button"
+                  aria-label="Touche de pause"
+                  title="Cliquer puis appuyer sur une touche"></button></label>
+              <label class="pause-map" title="Strum haut"><i
+                  class="fa-solid fa-arrow-up" aria-hidden="true"></i><button
+                  class="web-hero-strum-key" type="button"
+                  aria-label="Touche de strum haut"
+                  title="Cliquer puis appuyer sur une touche"></button></label>
+              <label class="pause-map" title="Strum bas"><i
+                  class="fa-solid fa-arrow-down" aria-hidden="true"></i><button
+                  class="web-hero-strum-key" type="button"
+                  aria-label="Touche de strum bas"
+                  title="Cliquer puis appuyer sur une touche"></button></label>
+            </div>
+          </section>
+          <section class="settings-panel key-row" role="group"
+            aria-label="Configuration des touches de jeu">
+            <div class="panel-head"><span class="footer-section-label"><i
+                  class="fa-solid fa-user-pen"></i> Custom</span></div>
+          </section>
         </div>
         <div class="touch-controls" role="group" aria-label="Touches tactiles">
           <button class="touch-lane lane-0" type="button"

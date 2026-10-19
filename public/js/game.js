@@ -8,16 +8,27 @@ import {
   parseWebHeroMidi,
   scheduleWebHeroLongPauses,
   scheduleWebHeroLyrics,
+  scheduleWebHeroBeats,
   scheduleWebHeroTrack,
-} from "./pde_hero_chart.mjs";
+} from "./web_hero_chart.mjs";
 import { parseSongIni, selectChartFolderFiles } from "./chart-import.mjs";
-import { createGameRenderer } from "./game-renderer.mjs";
 import {
-  decodeMidi,
-  encodeMidi,
+  createGameRenderer,
+  HIT_ZONE_OFFSET,
+  NOTE_MAX_RADIUS,
+  TARGET_MAX_RADIUS,
+} from "./game-renderer.mjs";
+import {
+  canFretHit,
+  diffPadLanes,
   findAutoHitNote,
+  findGuitarGroup,
   findHitNote,
+  fretsMatch,
   getHoldTapLanes,
+  getPressedPadButtons,
+  pickPad,
+  GUITAR_WINDOW,
   loadKeys,
   selectChartTrack,
 } from "./utils.js";
@@ -25,6 +36,7 @@ import {
 const DEFAULT_KEYS = ["d", "f", "j", "k", "l"];
 const LANE_RANKS = [0, 1, 2, 3, 4];
 const SETTINGS_KEY = "web-hero-settings";
+const REWIND_MS = 3000;
 const COLORS = ["#ff4f64", "#ffb347", "#ffe14a", "#63e6be", "#74a7ff"];
 const DIFFICULTIES = {
   easy: { label: "Facile", travelTime: 3200 },
@@ -46,6 +58,10 @@ export function initWebHero(socket = null) {
   const chartSpeedValue = document.getElementById("web-hero-chart-speed-value");
   const hyperspeedInput = document.getElementById("web-hero-hyperspeed");
   const hyperspeedValue = document.getElementById("web-hero-hyperspeed-value");
+  const audioDelayInput = document.getElementById("web-hero-audio-delay");
+  const audioDelayValue = document.getElementById("web-hero-audio-delay-value");
+  const videoDelayInput = document.getElementById("web-hero-video-delay");
+  const videoDelayValue = document.getElementById("web-hero-video-delay-value");
   const keyInputs = [...document.querySelectorAll(".web-hero-key")];
   if (
     !stage ||
@@ -64,6 +80,7 @@ export function initWebHero(socket = null) {
     return;
 
   const statusEl = document.getElementById("web-hero-status-text");
+  const importProgress = document.getElementById("web-hero-import-progress");
   const gameOverEl = document.getElementById("web-hero-game-over");
   const restartButton = document.getElementById("web-hero-restart");
   const returnButton = document.getElementById("web-hero-return");
@@ -76,9 +93,19 @@ export function initWebHero(socket = null) {
   const finalDelayEl = document.getElementById("web-hero-final-delay");
   const gameOverTitleEl = document.getElementById("web-hero-result-title");
   const lyricsEl = document.getElementById("web-hero-lyrics");
+  const pauseEl = document.getElementById("web-hero-pause");
+  const resumeButton = document.getElementById("web-hero-resume");
+  const quitButton = document.getElementById("web-hero-quit");
+  const noFailInput = document.getElementById("web-hero-nofail");
   let lyricSpans = [];
   const state = {
     running: false,
+    paused: false,
+    pausedAt: 0,
+    noFail: false,
+    chartSpeed: 1,
+    audioDelay: 0,
+    videoDelay: 0,
     score: 0,
     combo: 0,
     multiplier: 1,
@@ -101,12 +128,18 @@ export function initWebHero(socket = null) {
     lyricPhraseIndex: -1,
     lyricActiveIndex: -1,
     particles: [],
+    fireAt: [-Infinity, -Infinity, -Infinity, -Infinity, -Infinity],
+    beats: [],
     chart: null,
     chartDuration: 0,
     travelTime: 0,
     animation: 0,
     lastFrame: 0,
     missFlashUntil: 0,
+    heldLanes: [],
+    lastHitAt: 0,
+    lastFretAt: 0,
+    heldSig: "",
     viewWidth: 0,
     viewHeight: 0,
     difficulty: difficultySelect.value,
@@ -122,7 +155,6 @@ export function initWebHero(socket = null) {
     colors: COLORS,
   });
   let savedSettings = {};
-  let importedChartSource = null;
   let audioContext = null;
   let audioBuffers = [];
   let audioSources = [];
@@ -148,6 +180,8 @@ export function initWebHero(socket = null) {
   for (const [input, value] of [
     [chartSpeedInput, savedSettings.chartSpeed],
     [hyperspeedInput, savedSettings.hyperspeed],
+    [audioDelayInput, savedSettings.audioDelay],
+    [videoDelayInput, savedSettings.videoDelay],
   ]) {
     if (Number.isFinite(value)) {
       input.value = String(
@@ -157,26 +191,9 @@ export function initWebHero(socket = null) {
   }
   chartSpeedValue.value = `${Math.round(Number(chartSpeedInput.value) * 100)} %`;
   hyperspeedValue.value = `${Number(hyperspeedInput.value).toFixed(1)}×`;
-  if (
-    typeof savedSettings.importedChart?.name === "string" &&
-    typeof savedSettings.importedChart?.content === "string"
-  ) {
-    try {
-      state.chart =
-        savedSettings.importedChart.format === "midi"
-          ? parseWebHeroMidi(decodeMidi(savedSettings.importedChart.content))
-          : parseWebHeroChart(savedSettings.importedChart.content);
-      importedChartSource = savedSettings.importedChart;
-      statusEl.textContent = `${importedChartSource.name} chargé depuis les paramètres locaux, sans bande-son.`;
-    } catch (error) {
-      console.error(
-        "La dernière chart Web Hero sauvegardée est invalide.",
-        error,
-      );
-      statusEl.textContent =
-        "La dernière chart Web Hero sauvegardée est invalide.";
-    }
-  }
+  audioDelayValue.value = `${audioDelayInput.value} ms`;
+  videoDelayValue.value = `${videoDelayInput.value} ms`;
+  noFailInput.checked = savedSettings.noFail === true;
 
   function saveSettings() {
     try {
@@ -186,7 +203,9 @@ export function initWebHero(socket = null) {
           difficulty: difficultySelect.value,
           chartSpeed: Number(chartSpeedInput.value),
           hyperspeed: Number(hyperspeedInput.value),
-          importedChart: importedChartSource,
+          audioDelay: Number(audioDelayInput.value),
+          videoDelay: Number(videoDelayInput.value),
+          noFail: noFailInput.checked,
         }),
       );
     } catch (error) {
@@ -205,21 +224,91 @@ export function initWebHero(socket = null) {
     difficultySelect.disabled = disabled;
     chartSpeedInput.disabled = disabled;
     hyperspeedInput.disabled = disabled;
+    audioDelayInput.disabled = disabled;
+    videoDelayInput.disabled = disabled;
+    noFailInput.disabled = disabled;
   }
 
-  keyInputs.forEach((input, index) => {
-    input.value = keys[index].toUpperCase();
-    input.addEventListener("change", () => {
-      const value = input.value.trim().toLowerCase().slice(0, 1);
-      if (!value || keys.includes(value)) {
-        input.value = keys[index].toUpperCase();
-        return;
-      }
-      keys[index] = value;
-      input.value = value.toUpperCase();
-      localStorage.setItem("web-hero-keys", JSON.stringify(keys));
+  let keyLearn = -1;
+  let guitarMode = false;
+  let pauseKey = localStorage.getItem("web-hero-pause-key") || "Escape";
+  let pauseKeyLearn = false;
+  const keyLabel = (code) =>
+    ({ ArrowUp: "↑", ArrowDown: "↓", ArrowLeft: "←", ArrowRight: "→" })[code] ??
+    code.replace(/^(Key|Digit)/, "");
+  const pauseKeyEl = document.getElementById("web-hero-pause-key");
+  const showPauseKey = () => (pauseKeyEl.textContent = keyLabel(pauseKey));
+  showPauseKey();
+  pauseKeyEl.addEventListener("click", () => {
+    pauseKeyLearn = true;
+    pauseKeyEl.textContent = "…";
+  });
+  let strumKeys = JSON.parse(
+    localStorage.getItem("web-hero-strum-keys") || '["ArrowUp","ArrowDown"]',
+  );
+  let strumKeyLearn = -1;
+  const strumKeyEls = [...document.querySelectorAll(".web-hero-strum-key")];
+  const showStrumKey = (i) =>
+    (strumKeyEls[i].textContent = keyLabel(strumKeys[i]));
+  strumKeyEls.forEach((el, i) => {
+    showStrumKey(i);
+    el.addEventListener("click", () => {
+      if (strumKeyLearn >= 0) showStrumKey(strumKeyLearn);
+      strumKeyLearn = i;
+      el.textContent = "…";
     });
   });
+  const showKey = (i) => (keyInputs[i].textContent = keys[i].toUpperCase());
+  keyInputs.forEach((el, lane) => {
+    showKey(lane);
+    el.addEventListener("click", () => {
+      if (keyLearn >= 0) showKey(keyLearn);
+      keyLearn = lane;
+      el.textContent = "…";
+    });
+  });
+  // Retourne true si l'événement a servi à assigner (ou annuler) une touche.
+  function learnKey(event) {
+    if (pauseKeyLearn) {
+      event.preventDefault();
+      pauseKey = event.code;
+      pauseKeyLearn = false;
+      localStorage.setItem("web-hero-pause-key", pauseKey);
+      showPauseKey();
+      return true;
+    }
+    if (strumKeyLearn >= 0) {
+      event.preventDefault();
+      const i = strumKeyLearn;
+      strumKeys[i] = event.code;
+      strumKeyLearn = -1;
+      localStorage.setItem("web-hero-strum-keys", JSON.stringify(strumKeys));
+      showStrumKey(i);
+      return true;
+    }
+    if (keyLearn < 0) return false;
+    event.preventDefault();
+    const lane = keyLearn;
+    const value = event.key.toLowerCase();
+    if (event.key === "Escape" || event.key.length !== 1) {
+      if (
+        event.key !== "Shift" &&
+        event.key !== "Control" &&
+        event.key !== "Alt"
+      ) {
+        keyLearn = -1;
+        showKey(lane);
+      }
+      return true;
+    }
+    if (!keys.includes(value)) {
+      keys[lane] = value;
+      localStorage.setItem("web-hero-keys", JSON.stringify(keys));
+    }
+    keyLearn = -1;
+    showKey(lane);
+    return true;
+  }
 
   function updateLyrics() {
     const lyric = state.lyrics[state.lyricIndex];
@@ -256,10 +345,22 @@ export function initWebHero(socket = null) {
   function frame(now) {
     if (!state.running) return;
     state.lastFrame = now;
+    if (guitarMode) {
+      // Toute variation de frettes (appui ou relâchement : pull-off) compte comme un tap.
+      const sig = getHeldLanes().join();
+      if (sig !== state.heldSig) {
+        state.heldSig = sig;
+        state.lastFretAt = now;
+      }
+      tryFretHit(now);
+    }
     const travelTime = state.travelTime;
-    const hitY = state.viewHeight - 48;
+    const hitY = state.viewHeight - HIT_ZONE_OFFSET;
     const { laneWidth } = getTrackBounds();
-    const noteRadius = Math.max(0, Math.min(20, laneWidth / 2 - 6));
+    const noteRadius = Math.max(
+      0,
+      Math.min(NOTE_MAX_RADIUS, laneWidth / 2 - 6),
+    );
     const distanceAfterHitZone = state.viewHeight - hitY + noteRadius;
     const timePastHitZone =
       travelTime * (distanceAfterHitZone / Math.max(1, hitY));
@@ -274,8 +375,11 @@ export function initWebHero(socket = null) {
         spawnAt: pendingNote.spawnAt,
         travelTime: pendingNote.travelTime,
         hitAt,
-        missAt: hitAt + timePastHitZone,
+        // La note doit survivre à la fenêtre de strum, sinon son miss n'est jamais compté.
+        missAt: hitAt + Math.max(timePastHitZone, GUITAR_WINDOW + 50),
         sustain: pendingNote.sustain,
+        type: pendingNote.type,
+        missed: false,
         sustainEndAt: hitAt + pendingNote.sustain * 1000,
         holding: false,
         hitRegistered: false,
@@ -305,25 +409,23 @@ export function initWebHero(socket = null) {
         creditSustain(note, now);
         if (now >= note.sustainEndAt) endSustain(note, note.sustainEndAt);
       }
-      if (!note.hitRegistered && note.missAt < now) registerMiss();
-      if (!state.running) return;
-      if (note.holding && now - (note.lastParticleAt || 0) >= 65) {
-        note.lastParticleAt = now;
-        const { center: x } = getLaneBounds(note.lane);
-        const y = hitY - 8;
-        state.particles.push(
-          ...Array.from({ length: 3 }, () => ({
-            x,
-            y,
-            vx: (Math.random() - 0.5) * 90,
-            vy: -(18 + Math.random() * 50),
-            size: 3 + Math.random() * 3,
-            color: COLORS[note.lane],
-            createdAt: now,
-            duration: 350 + Math.random() * 250,
-          })),
-        );
+      if (!note.hitRegistered && !note.missed) {
+        const lateAt = guitarMode ? note.hitAt + GUITAR_WINDOW : note.missAt;
+        if (lateAt < now) {
+          // Un accord raté ne compte qu'un seul miss.
+          const mates = guitarMode
+            ? state.notes.filter(
+                (n) =>
+                  !n.hitRegistered &&
+                  !n.missed &&
+                  Math.abs(n.hitAt - note.hitAt) < 1,
+              )
+            : [note];
+          mates.forEach((n) => (n.missed = true));
+          registerMiss();
+        }
       }
+      if (!state.running) return;
       if (
         note.hitRegistered
           ? !note.holding && now >= note.sustainEndAt
@@ -348,7 +450,8 @@ export function initWebHero(socket = null) {
       state.lyricIndex += 1;
     }
     updateLyrics();
-    draw(now);
+    state.heldLanes = getHeldLanes();
+    draw(now + state.videoDelay);
     state.animation = requestAnimationFrame(frame);
   }
 
@@ -358,11 +461,12 @@ export function initWebHero(socket = null) {
     state.maxCombo = Math.max(state.maxCombo, state.combo);
     state.combo = 0;
     state.multiplier = 1;
+    state.missFlashUntil = performance.now() + 180;
+    if (state.noFail) return;
     state.stagePresence = adjustWebHeroStagePresence(
       state.stagePresence,
       false,
     );
-    state.missFlashUntil = performance.now() + 180;
     if (state.stagePresence <= 0) {
       finish("Stage presence épuisée");
     }
@@ -370,6 +474,16 @@ export function initWebHero(socket = null) {
 
   function registerOverHit() {
     if (!state.running) return;
+    if (guitarMode && !state.noFail) {
+      state.stagePresence = adjustWebHeroStagePresence(
+        state.stagePresence,
+        false,
+      );
+      if (state.stagePresence <= 0) {
+        registerMiss();
+        return;
+      }
+    }
     state.overHits += 1;
     state.maxCombo = Math.max(state.maxCombo, state.combo);
     state.combo = 0;
@@ -391,13 +505,16 @@ export function initWebHero(socket = null) {
     { completed = false, stopped = false } = {},
   ) {
     if (!state.running) return;
+    const endedAt = state.paused ? state.pausedAt : performance.now();
+    state.paused = false;
+    pauseEl.hidden = true;
     state.running = false;
     stopSong();
     stage.classList.remove("is-playing");
     cancelAnimationFrame(state.animation);
     const duration = Math.max(
       0,
-      Math.floor((performance.now() - state.startedAt) / 1000),
+      Math.floor((endedAt - state.startedAt) / 1000),
     );
     state.longest = Math.max(state.longest, duration);
     state.maxCombo = Math.max(state.maxCombo, state.combo);
@@ -432,7 +549,7 @@ export function initWebHero(socket = null) {
     gameOverEl.hidden = false;
     restartButton.focus();
     setChartControlsDisabled(false);
-    if (completed && socket) {
+    if (completed && socket && !state.noFail) {
       socket.emit("webhero:final", {
         score: state.score,
         duration,
@@ -447,6 +564,106 @@ export function initWebHero(socket = null) {
       });
     }
     lyricsEl.hidden = true;
+  }
+
+  function shiftTimes(delta) {
+    const shift = (o, ...ks) =>
+      ks.forEach((k) => typeof o[k] === "number" && (o[k] += delta));
+    state.notes.forEach((n) =>
+      shift(
+        n,
+        "spawnAt",
+        "hitAt",
+        "missAt",
+        "sustainEndAt",
+        "sustainStartedAt",
+        "releasedAt",
+        "lastParticleAt",
+      ),
+    );
+    state.pendingNotes.forEach((n) => shift(n, "spawnAt"));
+    state.lyrics.forEach((l) => shift(l, "at"));
+    state.lyricPhrases.forEach((p) =>
+      p.syllables.forEach((s) => shift(s, "at")),
+    );
+    state.longPauses.forEach((p) => shift(p, "startAt", "endAt", "nextNoteAt"));
+    state.particles.forEach((p) => shift(p, "createdAt"));
+    state.fireAt = state.fireAt.map((t) => t + delta);
+    state.beats.forEach((b) => shift(b, "hitAt"));
+    shift(
+      state,
+      "startedAt",
+      "missFlashUntil",
+      "lastHitAt",
+      "lastFretAt",
+      "lastFrame",
+    );
+  }
+
+  function pause() {
+    if (!state.running || state.paused) return;
+    state.paused = true;
+    state.pausedAt = performance.now();
+    cancelAnimationFrame(state.animation);
+    for (const note of state.notes) {
+      if (note.holding) endSustain(note, state.pausedAt);
+    }
+    stopSong();
+    pauseEl.hidden = false;
+    resumeButton.focus();
+  }
+
+  // Recule la chart et la musique de ms ; les notes déjà jouées ne reviennent pas.
+  function rewindChart(ms) {
+    const upcoming = state.notes.filter((n) => !n.hitRegistered && !n.missed);
+    state.notes = state.notes.filter((n) => n.hitRegistered || n.missed);
+    state.pendingNotes.unshift(
+      ...upcoming.map(({ lane, spawnAt, travelTime, sustain, type }) => ({
+        lane,
+        spawnAt,
+        travelTime,
+        sustain,
+        type,
+      })),
+    );
+    state.pendingNotes.forEach((n) => (n.spawnAt += ms));
+    state.lyrics.forEach((l) => (l.at += ms));
+    state.lyricPhrases.forEach((p) => p.syllables.forEach((s) => (s.at += ms)));
+    state.longPauses.forEach((p) => {
+      p.startAt += ms;
+      p.endAt += ms;
+      p.nextNoteAt += ms;
+    });
+    state.startedAt += ms;
+    state.beats.forEach((b) => (b.hitAt += ms));
+  }
+
+  function resume() {
+    if (!state.running || !state.paused) return;
+    const now = performance.now();
+    shiftTimes(now - state.pausedAt);
+    rewindChart(REWIND_MS);
+    state.lyricIndex = state.lyrics.findLastIndex((l) => l.at <= now);
+    state.lyricPhraseIndex = -1;
+    state.lyricActiveIndex = -1;
+    if (audioBuffers.length) {
+      const songPos =
+        ((now - state.startedAt - state.audioDelay) / 1000) * state.chartSpeed;
+      playAudio(
+        state.chartSpeed,
+        audioContext.currentTime + Math.max(0, -songPos) / state.chartSpeed,
+        Math.max(0, songPos),
+      );
+    }
+    state.paused = false;
+    pauseEl.hidden = true;
+    canvas.focus({ preventScroll: true });
+    state.animation = requestAnimationFrame(frame);
+  }
+
+  function startPressed() {
+    if (state.running) return state.paused ? resume() : pause();
+    if (!startButton.disabled) start();
   }
 
   async function start() {
@@ -481,8 +698,11 @@ export function initWebHero(socket = null) {
     const hyperspeed = Number(hyperspeedInput.value);
     const travelTime = DIFFICULTIES[state.difficulty].travelTime / hyperspeed;
     const startAt = performance.now() + travelTime;
+    const audioDelay = Number(audioDelayInput.value);
+    state.audioDelay = audioDelay;
+    state.videoDelay = Number(videoDelayInput.value);
     const audioStartAt = audioBuffers.length
-      ? audioContext.currentTime + travelTime / 1000
+      ? audioContext.currentTime + Math.max(0, travelTime + audioDelay) / 1000
       : null;
     const schedule = scheduleWebHeroTrack(
       chartTrack,
@@ -509,6 +729,8 @@ export function initWebHero(socket = null) {
     state.overHits = 0;
     state.sustainSeconds = 0;
     state.stagePresence = 80;
+    state.noFail = noFailInput.checked;
+    state.paused = false;
     state.totalNotes = schedule.notes.length;
     state.chartDifficulty = chartDifficulty;
     state.scoreMultiplier = getWebHeroScoreMultiplier(
@@ -519,6 +741,7 @@ export function initWebHero(socket = null) {
     state.longest = 0;
     state.notes = [];
     state.travelTime = travelTime;
+    state.chartSpeed = chartSpeed;
     state.startedAt = schedule.startAt;
     state.pendingNotes = schedule.notes;
     state.lyrics = scheduleWebHeroLyrics(
@@ -533,6 +756,11 @@ export function initWebHero(socket = null) {
     lyricsEl.replaceChildren();
     lyricsEl.hidden = state.lyrics.length === 0;
     state.particles = [];
+    state.beats = scheduleWebHeroBeats(
+      state.chart.beats || [],
+      schedule.startAt,
+      chartSpeed,
+    );
     state.chartDuration = schedule.duration;
     state.lastFrame = state.startedAt;
     startButton.disabled = true;
@@ -542,33 +770,33 @@ export function initWebHero(socket = null) {
     statusEl.textContent = `En jeu — ${DIFFICULTIES[chartDifficulty].label} (${chartTrack.name})`;
     state.animation = requestAnimationFrame(frame);
     if (audioBuffers.length) {
-      for (const buffer of audioBuffers) {
-        const source = audioContext.createBufferSource();
-        const gain = audioContext.createGain();
-        source.buffer = buffer;
-        source.playbackRate.value = chartSpeed;
-        gain.gain.value = 1 / audioBuffers.length;
-        source.connect(gain);
-        gain.connect(audioContext.destination);
-        source.onended = () => {
-          source.disconnect();
-          audioSources = audioSources.filter((active) => active !== source);
-        };
-        audioSources.push(source);
-        source.start(audioStartAt);
-      }
+      playAudio(chartSpeed, audioStartAt, 0);
     } else {
       statusEl.textContent += " — aucune bande-son associée";
     }
   }
 
+  // offset en secondes de buffer ; startAt en temps AudioContext.
+  function playAudio(chartSpeed, startAt, offset) {
+    for (const buffer of audioBuffers) {
+      const source = audioContext.createBufferSource();
+      const gain = audioContext.createGain();
+      source.buffer = buffer;
+      source.playbackRate.value = chartSpeed;
+      gain.gain.value = 1 / audioBuffers.length;
+      source.connect(gain);
+      gain.connect(audioContext.destination);
+      source.onended = () => {
+        source.disconnect();
+        audioSources = audioSources.filter((active) => active !== source);
+      };
+      audioSources.push(source);
+      source.start(startAt, offset);
+    }
+  }
+
   function registerHit(hitNote, lane, now) {
-    const hitY = state.viewHeight - 48;
-    const noteProgress = Math.min(
-      1,
-      (now - hitNote.spawnAt) / hitNote.travelTime,
-    );
-    const noteY = Math.min(hitY, noteProgress * hitY);
+    state.fireAt[lane] = now;
     state.hits += 1;
     state.hitDelayTotal += now - hitNote.hitAt;
     state.combo += 1;
@@ -576,21 +804,6 @@ export function initWebHero(socket = null) {
     state.multiplier = getWebHeroMultiplier(state.combo);
     state.stagePresence = adjustWebHeroStagePresence(state.stagePresence, true);
     state.score += Math.round(100 * state.multiplier * state.scoreMultiplier);
-    const { laneWidth, center: laneCenter } = getLaneBounds(lane);
-    const fireColors = ["#fff7ae", "#ffd43b", "#ff8a24", "#ed4228"];
-    state.particles.push(
-      ...Array.from({ length: 16 }, (_, index) => ({
-        x: laneCenter + (Math.random() - 0.5) * laneWidth * 0.45,
-        y: noteY,
-        vx: (Math.random() - 0.5) * laneWidth * 1.4,
-        vy: -(85 + Math.random() * 190),
-        size: 3 + Math.random() * 6,
-        color: fireColors[index % fireColors.length],
-        fire: true,
-        createdAt: now,
-        duration: 320 + Math.random() * 260,
-      })),
-    );
   }
 
   function creditSustain(note, at) {
@@ -622,7 +835,7 @@ export function initWebHero(socket = null) {
   }
 
   function hit(lane) {
-    if (!state.running) return;
+    if (!state.running || state.paused) return;
     const now = performance.now();
     if (
       state.longPauses.some(
@@ -636,17 +849,28 @@ export function initWebHero(socket = null) {
     }
     const index = findHitNote(state.notes, [lane], now);
     if (index < 0) {
-      const expiredIndex = state.notes.findIndex((note) =>
-        note.lane === lane && !note.hitRegistered && now > note.missAt
+      const expiredIndex = state.notes.findIndex(
+        (note) =>
+          note.lane === lane && !note.hitRegistered && now > note.missAt,
       );
       if (expiredIndex >= 0) {
         state.notes.splice(expiredIndex, 1);
         registerMiss();
         return;
       }
+      // Pas de pénalité si on rejoue une lane en sustain ou qu'une autre frette est tenue (tap).
+      if (
+        state.notes.some((n) => n.lane === lane && n.holding) ||
+        getHeldLanes().some((l) => l !== lane)
+      )
+        return;
       registerOverHit();
       return;
     }
+    consume(index, now, registerLaneHit);
+  }
+
+  function consume(index, now, register) {
     const hitNote = state.notes[index];
     if (hitNote.sustain > 0) {
       hitNote.holding = true;
@@ -655,22 +879,56 @@ export function initWebHero(socket = null) {
       hitNote.sustainStartedAt = now;
       hitNote.sustainScoredSeconds = 0;
       hitNote.sustainEndAt = hitNote.hitAt + hitNote.sustain * 1000;
-      registerLaneHit(hitNote, hitNote.lane, now);
+      register(hitNote, hitNote.lane, now);
       return;
     }
     state.notes.splice(index, 1);
-    registerLaneHit(hitNote, hitNote.lane, now);
+    register(hitNote, hitNote.lane, now);
+  }
+
+  function hitGuitarGroup(group, now) {
+    for (const note of group.notes) {
+      consume(state.notes.indexOf(note), now, registerHit);
+    }
+    state.lastHitAt = now;
+  }
+
+  function strum() {
+    if (!state.running || state.paused) return;
+    const now = performance.now();
+    if (state.longPauses.some((p) => now >= p.startAt && now < p.endAt)) return;
+    const group = findGuitarGroup(state.notes, now);
+    if (group && fretsMatch(group.lanes, getHeldLanes()))
+      hitGuitarGroup(group, now);
+    else registerOverHit();
+  }
+
+  // HOPO (chaîne en cours) et TAP : validés par une frette pressée, sans strum.
+  function tryFretHit(now) {
+    if (!state.running || state.paused || state.lastFretAt <= state.lastHitAt)
+      return;
+    const group = findGuitarGroup(state.notes, now);
+    if (
+      group &&
+      canFretHit(group.type, state.combo) &&
+      fretsMatch(group.lanes, getHeldLanes())
+    )
+      hitGuitarGroup(group, now);
+  }
+
+  function fretDown() {
+    state.lastFretAt = performance.now();
+    // La frette est ajoutée aux touches tenues après pressLane.
+    queueMicrotask(() => tryFretHit(performance.now()));
   }
 
   function registerLaneHit(note, lane, now) {
     registerHit(note, lane, now);
-    for (
-      const heldLane of getHoldTapLanes(
-        lane,
-        getHeldLanes(),
-        LANE_RANKS,
-      ).slice(1)
-    ) {
+    for (const heldLane of getHoldTapLanes(
+      lane,
+      getHeldLanes(),
+      LANE_RANKS,
+    ).slice(1)) {
       autoHitLanes.add(heldLane);
     }
   }
@@ -683,7 +941,13 @@ export function initWebHero(socket = null) {
     );
     if (index < 0) return;
     const note = state.notes[index];
-    endSustain(note, Math.min(performance.now(), note.sustainEndAt));
+    endSustain(
+      note,
+      Math.min(
+        state.paused ? state.pausedAt : performance.now(),
+        note.sustainEndAt,
+      ),
+    );
   }
 
   const heldKeyboardLanes = new Map();
@@ -695,15 +959,15 @@ export function initWebHero(socket = null) {
     return [...heldKeyboardLanes.values(), ...heldTouchLanes.keys()];
   }
   function pressLane(lane) {
-    hit(lane);
+    if (guitarMode) fretDown();
+    else hit(lane);
   }
   function clearHeldKeys() {
-    for (
-      const lane of new Set([
-        ...heldKeyboardLanes.values(),
-        ...heldTouchLanes.keys(),
-      ])
-    ) release(keys[lane]);
+    for (const lane of new Set([
+      ...heldKeyboardLanes.values(),
+      ...heldTouchLanes.keys(),
+    ]))
+      release(keys[lane]);
     heldKeyboardLanes.clear();
     heldTouchPointers.clear();
     heldTouchLanes.clear();
@@ -769,7 +1033,7 @@ export function initWebHero(socket = null) {
     const y = ((event.clientY - rect.top) * state.viewHeight) / rect.height;
     const track = getTrackBounds();
     const lane = Math.floor((x - track.x) / track.laneWidth);
-    const targetRadius = Math.min(24, track.laneWidth / 2 - 5);
+    const targetRadius = Math.min(TARGET_MAX_RADIUS, track.laneWidth / 2 - 5);
     const touchRadius = Math.min(
       track.laneWidth / 2,
       Math.max(24, targetRadius + 8),
@@ -779,7 +1043,7 @@ export function initWebHero(socket = null) {
       x >= track.x + track.width ||
       lane < 0 ||
       lane >= 5 ||
-      Math.abs(y - (state.viewHeight - 48)) > touchRadius
+      Math.abs(y - (state.viewHeight - HIT_ZONE_OFFSET)) > touchRadius
     )
       return;
     event.preventDefault();
@@ -799,6 +1063,11 @@ export function initWebHero(socket = null) {
     finish("Partie arrêtée — score non enregistré", { stopped: true }),
   );
   restartButton.addEventListener("click", start);
+  resumeButton.addEventListener("click", resume);
+  quitButton.addEventListener("click", () =>
+    finish("Partie arrêtée — score non enregistré", { stopped: true }),
+  );
+  noFailInput.addEventListener("change", saveSettings);
   returnButton?.addEventListener("click", () => {
     state.notes = [];
     state.pendingNotes = [];
@@ -825,6 +1094,16 @@ export function initWebHero(socket = null) {
           await document.exitFullscreen();
         } else {
           await stage.requestFullscreen();
+
+          for (const [input, output] of [
+            [audioDelayInput, audioDelayValue],
+            [videoDelayInput, videoDelayValue],
+          ]) {
+            input.addEventListener("input", () => {
+              output.value = `${input.value} ms`;
+              saveSettings();
+            });
+          }
         }
       } catch (error) {
         statusEl.textContent = `Plein écran indisponible : ${error.message}`;
@@ -844,44 +1123,48 @@ export function initWebHero(socket = null) {
     try {
       if (state.running)
         throw new Error("Terminez la partie avant d’importer.");
+      setChartControlsDisabled(true);
+      startButton.disabled = true;
       const {
         chartFile: file,
         audioFiles,
         iniFile,
         folderName,
       } = selectChartFolderFiles(files);
+      const totalSteps = 1 + audioFiles.length;
+      let doneSteps = 0;
+      const progress = (label) => {
+        importProgress.hidden = false;
+        importProgress.value = doneSteps / totalSteps;
+        statusEl.textContent = `${label} — ${Math.round((doneSteps / totalSteps) * 100)} %`;
+      };
+      progress("Lecture de la chart");
+      await new Promise((resolve) => setTimeout(resolve));
       const extension = file.name.split(".").pop().toLowerCase();
       let chart;
-      let source;
       const songName = iniFile
         ? parseSongIni(await iniFile.text()) || folderName
         : folderName;
       if (extension === "chart") {
-        const content = await file.text();
-        chart = parseWebHeroChart(content);
-        source = { name: songName, content, format: "chart" };
+        chart = parseWebHeroChart(await file.text());
       } else {
-        const content = await file.arrayBuffer();
-        chart = parseWebHeroMidi(content);
-        source = {
-          name: songName,
-          content: encodeMidi(content),
-          format: "midi",
-        };
+        chart = parseWebHeroMidi(await file.arrayBuffer());
       }
+      doneSteps++;
       const decodedAudio = [];
       if (audioFiles.length) {
         audioContext ||= new AudioContext();
-        for (const audioFile of audioFiles) {
+        for (const [index, audioFile] of audioFiles.entries()) {
+          progress(`Audio ${index + 1}/${audioFiles.length}`);
           decodedAudio.push(
             await audioContext.decodeAudioData(await audioFile.arrayBuffer()),
           );
+          doneSteps++;
         }
       }
+      importProgress.value = 1;
       state.chart = chart;
-      importedChartSource = source;
       audioBuffers = decodedAudio;
-      saveSettings();
       const selectedTrack = selectChartTrack(
         state.chart,
         difficultySelect.value,
@@ -896,6 +1179,11 @@ export function initWebHero(socket = null) {
       statusEl.textContent = `Import impossible : ${error.message}`;
     } finally {
       chartFileInput.value = "";
+      importProgress.hidden = true;
+      if (!state.running) {
+        setChartControlsDisabled(false);
+        startButton.disabled = false;
+      }
     }
   });
   difficultySelect.addEventListener("change", () => {
@@ -906,12 +1194,19 @@ export function initWebHero(socket = null) {
     finish("Partie abandonnée : difficulté modifiée", { save: false });
   });
   window.addEventListener("keydown", (event) => {
-    if (event.repeat || event.target.matches("input, textarea, select")) return;
-    const lane = keys.indexOf(event.key.toLowerCase());
-    if (lane < 0) {
-      hit(-1);
+    if (learnKey(event)) return;
+    if (event.code === pauseKey && state.running) {
+      state.paused ? resume() : pause();
       return;
     }
+    if (event.repeat || event.target.matches("input, textarea, select")) return;
+    if (guitarMode && strumKeys.includes(event.code)) {
+      event.preventDefault();
+      strum();
+      return;
+    }
+    const lane = keys.indexOf(event.key.toLowerCase());
+    if (lane < 0 || event.ctrlKey || event.altKey || event.metaKey) return;
     pressLane(lane);
     heldKeyboardLanes.set(event.code, lane);
   });
@@ -925,9 +1220,96 @@ export function initWebHero(socket = null) {
     release(keys[lane]);
     if (!getHeldLanes().includes(lane)) autoHitLanes.delete(lane);
   });
+  // Une lane = ensemble de boutons (certaines guitares en envoient plusieurs par frette).
+  const padButtons = JSON.parse(
+    localStorage.getItem("web-hero-pad") || "[1,4,3,0,2]",
+  ).map((b) => [].concat(b));
+  // Ensembles 5 = pause (Start), 6 et 7 = strum haut/bas (croix directionnelle).
+  [[9], [12], [13]].forEach((defaults, i) => (padButtons[5 + i] ??= defaults));
+  const padEls = [...document.querySelectorAll(".web-hero-pad")];
+  let padLearn = -1;
+  const padDebugEl = document.getElementById("web-hero-pad-debug");
+  const padSeen = new Set();
+  const padLabel = (i) => padButtons[i].map((b) => `B${b}`).join("+");
+  padEls.forEach((el, lane) => {
+    el.textContent = padLabel(lane);
+    el.addEventListener("click", () => {
+      padLearn = lane;
+      padSeen.clear();
+      el.textContent = "…";
+    });
+  });
+  const padWasDown = new Set();
+  function pollPads() {
+    const pads = navigator.getGamepads?.() ?? [];
+    guitarMode = pads.some(Boolean);
+    const down = getPressedPadButtons(pads);
+    const axes = (pickPad(pads)?.axes ?? []).flatMap((v, i) =>
+      Math.abs(v) > 0.5 ? [`A${i}`] : [],
+    );
+    padDebugEl.title = pads
+      .filter(Boolean)
+      .map((p) => `${p.id} [${p.mapping}]`)
+      .join(" | ");
+    padDebugEl.textContent = [...[...down].map((b) => `B${b}`), ...axes].join(
+      " ",
+    );
+    if (padLearn >= 0) {
+      down.forEach((b) => padSeen.add(b));
+      if (down.size === 0 && padSeen.size > 0) {
+        padButtons[padLearn] = [...padSeen].sort((a, b) => a - b);
+        padSeen.clear();
+        localStorage.setItem("web-hero-pad", JSON.stringify(padButtons));
+        padEls[padLearn].textContent = padLabel(padLearn);
+        padLearn = -1;
+      }
+    } else {
+      const held = new Set(
+        [...heldKeyboardLanes]
+          .filter(([id]) => id.startsWith("pad"))
+          .map(([, l]) => l),
+      );
+      const { press, releaseLanes } = diffPadLanes(
+        padButtons.slice(0, 5),
+        down,
+        held,
+      );
+      for (const lane of press) {
+        pressLane(lane);
+        heldKeyboardLanes.set(`pad${lane}`, lane);
+      }
+      for (const lane of releaseLanes) {
+        heldKeyboardLanes.delete(`pad${lane}`);
+        release(keys[lane]);
+        if (!getHeldLanes().includes(lane)) autoHitLanes.delete(lane);
+      }
+    }
+    // Strum = croix directionnelle haut/bas (guitares XInput)
+    const isOn = (set, i) =>
+      padButtons[i].length > 0 && padButtons[i].every((b) => set.has(b));
+    if (padLearn < 0 && isOn(down, 5) && !isOn(padWasDown, 5)) startPressed();
+    if (guitarMode && padLearn < 0) {
+      for (const i of [6, 7])
+        if (isOn(down, i) && !isOn(padWasDown, i)) strum();
+    }
+    if (!state.running) {
+      const held = getHeldLanes();
+      if (held.join() !== state.heldLanes.join()) {
+        state.heldLanes = held;
+        draw(performance.now());
+      }
+    }
+    padWasDown.clear();
+    down.forEach((b) => padWasDown.add(b));
+    requestAnimationFrame(pollPads);
+  }
+  requestAnimationFrame(pollPads);
   window.addEventListener("blur", clearHeldKeys);
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) clearHeldKeys();
+    if (document.hidden) {
+      clearHeldKeys();
+      pause();
+    }
   });
   window.addEventListener("resize", resize);
   new ResizeObserver(resize).observe(canvas.parentElement);
