@@ -1,6 +1,7 @@
 export function createGameRenderer({ canvas, state, keys, colors }) {
   const ctx = canvas.getContext("2d");
   let trackBounds = { center: 0, x: 0, width: 0, laneWidth: 0 };
+  const multiplierColors = ["#aeb8c7", "#48d8c5", "#ffd43b", "#f05aa6"];
 
   function resize() {
     const width = Math.max(1, canvas.parentElement.clientWidth);
@@ -159,6 +160,7 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
       );
 
       const multiplierProgress = state.multiplier === 4 ? 10 : state.combo % 10;
+      const multiplierColor = multiplierColors[state.multiplier - 1];
       const segmentGap = 2;
       const orbRadius = Math.min(24, width * 0.045, height * 0.07);
       const orbX = trackX + trackWidth;
@@ -177,7 +179,7 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
           segmentHeight,
         );
       }
-      ctx.fillStyle = "#ffd400";
+      ctx.fillStyle = multiplierColor;
       for (let i = 0; i < multiplierProgress; i++) {
         ctx.fillRect(
           segmentsX,
@@ -191,9 +193,9 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
       ctx.fillStyle = "rgba(12,8,20,.9)";
       ctx.fill();
       ctx.lineWidth = 2;
-      ctx.strokeStyle = "#ffd400";
+      ctx.strokeStyle = multiplierColor;
       ctx.stroke();
-      ctx.fillStyle = "#ffd400";
+      ctx.fillStyle = multiplierColor;
       ctx.textAlign = "center";
       ctx.font = `bold ${Math.max(10, orbRadius * 1.05)}px sans-serif`;
       ctx.fillText(`x${state.multiplier}`, orbX, orbY);
@@ -225,6 +227,31 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
       ctx.globalAlpha = Math.max(0.35, 1 - progress);
       ctx.fillStyle = particle.color;
       ctx.beginPath();
+      if (particle.fire) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(0.65 * (1 - progress * 0.45), 1.5);
+        ctx.moveTo(0, radius);
+        ctx.bezierCurveTo(
+          -radius * 1.1,
+          radius * 0.15,
+          -radius * 0.2,
+          -radius * 0.5,
+          0,
+          -radius,
+        );
+        ctx.bezierCurveTo(
+          radius * 0.9,
+          -radius * 0.2,
+          radius * 0.8,
+          radius * 0.4,
+          0,
+          radius,
+        );
+        ctx.fill();
+        ctx.restore();
+        continue;
+      }
       ctx.arc(x, y, radius, 0, Math.PI * 2);
       ctx.fill();
     }

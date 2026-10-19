@@ -9,7 +9,7 @@ import {
   scheduleWebHeroLongPauses,
   scheduleWebHeroLyrics,
   scheduleWebHeroTrack,
-} from "./web_hero_chart.mjs";
+} from "./pde_hero_chart.mjs";
 import { parseSongIni, selectChartFolderFiles } from "./chart-import.mjs";
 import { createGameRenderer } from "./game-renderer.mjs";
 import { decodeMidi, encodeMidi, loadKeys, selectChartTrack } from "./utils.js";
@@ -250,8 +250,8 @@ export function initWebHero(socket = null) {
     const travelTime = state.travelTime;
     const hitY = state.viewHeight - 48;
     const { laneWidth } = getTrackBounds();
-    const noteDiameter = Math.min(42, laneWidth - 16);
-    const distanceAfterHitZone = state.viewHeight - hitY + noteDiameter / 2;
+    const noteRadius = Math.max(0, Math.min(20, laneWidth / 2 - 6));
+    const distanceAfterHitZone = state.viewHeight - hitY + noteRadius;
     const timePastHitZone =
       travelTime * (distanceAfterHitZone / Math.max(1, hitY));
     while (
@@ -453,6 +453,7 @@ export function initWebHero(socket = null) {
     const { difficulty: chartDifficulty, track: chartTrack } = selectChartTrack(
       state.chart,
       state.difficulty,
+      DIFFICULTY_ORDER,
     );
     const chartSpeed = Number(chartSpeedInput.value);
     const hyperspeed = Number(hyperspeedInput.value);
@@ -554,16 +555,18 @@ export function initWebHero(socket = null) {
     state.stagePresence = adjustWebHeroStagePresence(state.stagePresence, true);
     state.score += Math.round(100 * state.multiplier * state.scoreMultiplier);
     const { laneWidth, center: laneCenter } = getLaneBounds(lane);
+    const fireColors = ["#fff7ae", "#ffd43b", "#ff8a24", "#ed4228"];
     state.particles.push(
-      ...Array.from({ length: 16 }, () => ({
+      ...Array.from({ length: 22 }, (_, index) => ({
         x: laneCenter,
         y: noteY,
-        vx: (Math.random() - 0.5) * laneWidth * 3.2,
-        vy: -(40 + Math.random() * 80),
-        size: 5 + Math.random() * 5,
-        color: COLORS[lane],
+        vx: (Math.random() - 0.5) * laneWidth * 1.7,
+        vy: -(100 + Math.random() * 150),
+        size: 5 + Math.random() * 7,
+        color: fireColors[index % fireColors.length],
+        fire: true,
         createdAt: now,
-        duration: 650 + Math.random() * 300,
+        duration: 420 + Math.random() * 300,
       })),
     );
   }
@@ -825,6 +828,7 @@ export function initWebHero(socket = null) {
       const selectedTrack = selectChartTrack(
         state.chart,
         difficultySelect.value,
+        DIFFICULTY_ORDER,
       );
       gameOverEl.hidden = true;
       const audioStatus = audioFiles.length
@@ -858,7 +862,6 @@ export function initWebHero(socket = null) {
       "Importez une chart .chart/.mid, avec ses fichiers audio pour jouer en musique.";
   if (canvas) canvas.focus();
   alert(
-    "Conseil",
     "Sur PC, utilisez l'option de plein écran pour une meilleure expérience.",
   );
 }
