@@ -1,4 +1,4 @@
-export function parsePdeHeroChart(text) {
+export function parseWebHeroChart(text) {
   if (typeof text !== "string") throw new Error("Fichier .chart invalide.");
 
   const sections = new Map(
@@ -91,7 +91,7 @@ export function parsePdeHeroChart(text) {
   return { tracks, lyrics };
 }
 
-export function parsePdeHeroMidi(input) {
+export function parseWebHeroMidi(input) {
   const bytes =
     input instanceof ArrayBuffer
       ? new Uint8Array(input)
@@ -296,7 +296,7 @@ export function parsePdeHeroMidi(input) {
   };
 }
 
-export function schedulePdeHeroTrack(track, startAt, travelTime, chartSpeed) {
+export function scheduleWebHeroTrack(track, startAt, travelTime, chartSpeed) {
   return {
     startAt,
     duration: track.duration / chartSpeed,
@@ -309,7 +309,7 @@ export function schedulePdeHeroTrack(track, startAt, travelTime, chartSpeed) {
   };
 }
 
-export function schedulePdeHeroLongPauses(
+export function scheduleWebHeroLongPauses(
   track,
   startAt,
   chartSpeed,
@@ -340,7 +340,7 @@ export function schedulePdeHeroLongPauses(
   return pauses;
 }
 
-export function getPdeHeroScoreMultiplier(difficulty, chartSpeed, hyperspeed) {
+export function getWebHeroScoreMultiplier(difficulty, chartSpeed, hyperspeed) {
   const difficultyMultiplier = {
     easy: 0.25,
     medium: 0.5,
@@ -350,22 +350,22 @@ export function getPdeHeroScoreMultiplier(difficulty, chartSpeed, hyperspeed) {
   return difficultyMultiplier * chartSpeed * hyperspeed;
 }
 
-export function getPdeHeroMultiplier(combo) {
+export function getWebHeroMultiplier(combo) {
   return Math.min(4, 1 + Math.floor(combo / 10));
 }
 
-export function adjustPdeHeroStagePresence(presence, hit) {
+export function adjustWebHeroStagePresence(presence, hit) {
   return Math.max(0, Math.min(100, presence + (hit ? 1 : -10)));
 }
 
-export function schedulePdeHeroLyrics(lyrics, startAt, chartSpeed) {
+export function scheduleWebHeroLyrics(lyrics, startAt, chartSpeed) {
   return lyrics.map(({ time, text }) => ({
     at: startAt + (time / chartSpeed) * 1000,
     text,
   }));
 }
 
-export function groupPdeHeroLyrics(lyrics) {
+export function groupWebHeroLyrics(lyrics) {
   const phrases = [];
   let phrase;
   for (const [index, lyric] of lyrics.entries()) {
@@ -395,7 +395,7 @@ export function groupPdeHeroLyrics(lyrics) {
   return phrases;
 }
 
-export function getPdeHeroSustainBonus(
+export function getWebHeroSustainBonus(
   heldSeconds,
   multiplier,
   scoreMultiplier,

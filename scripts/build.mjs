@@ -5,4 +5,6 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 await access(path.join(root, "public", "index.html"));
 await access(path.join(root, "public", "js", "game.js"));
+await access(path.join(root, "public", "js", "game-renderer.mjs"));
+await access(path.join(root, "public", "js", "utils.js"));
 console.log("WebHero static client is ready.");

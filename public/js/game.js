@@ -1,19 +1,21 @@
 import {
-  adjustPdeHeroStagePresence,
-  getPdeHeroMultiplier,
-  getPdeHeroScoreMultiplier,
-  getPdeHeroSustainBonus,
-  groupPdeHeroLyrics,
-  parsePdeHeroChart,
-  parsePdeHeroMidi,
-  schedulePdeHeroLongPauses,
-  schedulePdeHeroLyrics,
-  schedulePdeHeroTrack,
-} from "./pde_hero_chart.mjs";
+  adjustWebHeroStagePresence,
+  getWebHeroMultiplier,
+  getWebHeroScoreMultiplier,
+  getWebHeroSustainBonus,
+  groupWebHeroLyrics,
+  parseWebHeroChart,
+  parseWebHeroMidi,
+  scheduleWebHeroLongPauses,
+  scheduleWebHeroLyrics,
+  scheduleWebHeroTrack,
+} from "./web_hero_chart.mjs";
 import { parseSongIni, selectChartFolderFiles } from "./chart-import.mjs";
+import { createGameRenderer } from "./game-renderer.mjs";
+import { decodeMidi, encodeMidi, loadKeys, selectChartTrack } from "./utils.js";
 
 const DEFAULT_KEYS = ["d", "f", "j", "k", "l"];
-const SETTINGS_KEY = "pde-hero-settings";
+const SETTINGS_KEY = "web-hero-settings";
 const COLORS = ["#ff4f64", "#ffb347", "#ffe14a", "#63e6be", "#74a7ff"];
 const DIFFICULTIES = {
   easy: { label: "Facile", travelTime: 3200 },
@@ -23,34 +25,19 @@ const DIFFICULTIES = {
 };
 const DIFFICULTY_ORDER = Object.keys(DIFFICULTIES);
 
-function encodeMidi(buffer) {
-  const bytes = new Uint8Array(buffer);
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  }
-  return btoa(binary);
-}
-
-function decodeMidi(base64) {
-  const binary = atob(base64);
-  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-  return bytes.buffer;
-}
-
-export function initPdeHero(socket = null) {
+export function initWebHero(socket = null) {
   const stage = document.getElementById("stage22");
-  const canvas = document.getElementById("pde-hero-canvas");
-  const startButton = document.getElementById("pde-hero-start");
-  const stopButton = document.getElementById("pde-hero-stop");
-  const chartImportButton = document.getElementById("pde-hero-chart-import");
-  const chartFileInput = document.getElementById("pde-hero-chart-file");
-  const difficultySelect = document.getElementById("pde-hero-difficulty");
-  const chartSpeedInput = document.getElementById("pde-hero-chart-speed");
-  const chartSpeedValue = document.getElementById("pde-hero-chart-speed-value");
-  const hyperspeedInput = document.getElementById("pde-hero-hyperspeed");
-  const hyperspeedValue = document.getElementById("pde-hero-hyperspeed-value");
-  const keyInputs = [...document.querySelectorAll(".pde-hero-key")];
+  const canvas = document.getElementById("web-hero-canvas");
+  const startButton = document.getElementById("web-hero-start");
+  const stopButton = document.getElementById("web-hero-stop");
+  const chartImportButton = document.getElementById("web-hero-chart-import");
+  const chartFileInput = document.getElementById("web-hero-chart-file");
+  const difficultySelect = document.getElementById("web-hero-difficulty");
+  const chartSpeedInput = document.getElementById("web-hero-chart-speed");
+  const chartSpeedValue = document.getElementById("web-hero-chart-speed-value");
+  const hyperspeedInput = document.getElementById("web-hero-hyperspeed");
+  const hyperspeedValue = document.getElementById("web-hero-hyperspeed-value");
+  const keyInputs = [...document.querySelectorAll(".web-hero-key")];
   if (
     !stage ||
     !canvas ||
@@ -67,20 +54,19 @@ export function initPdeHero(socket = null) {
   )
     return;
 
-  const ctx = canvas.getContext("2d");
-  const statusEl = document.getElementById("pde-hero-status");
-  const gameOverEl = document.getElementById("pde-hero-game-over");
-  const restartButton = document.getElementById("pde-hero-restart");
-  const returnButton = document.getElementById("pde-hero-return");
-  const finalScoreEl = document.getElementById("pde-hero-final-score");
-  const finalTimeEl = document.getElementById("pde-hero-final-time");
-  const finalAccuracyEl = document.getElementById("pde-hero-final-accuracy");
-  const finalNotesEl = document.getElementById("pde-hero-final-notes");
-  const finalHitsEl = document.getElementById("pde-hero-final-hits");
-  const finalStreakEl = document.getElementById("pde-hero-final-streak");
-  const finalDelayEl = document.getElementById("pde-hero-final-delay");
-  const gameOverTitleEl = document.getElementById("pde-hero-result-title");
-  const lyricsEl = document.getElementById("pde-hero-lyrics");
+  const statusEl = document.getElementById("web-hero-status-text");
+  const gameOverEl = document.getElementById("web-hero-game-over");
+  const restartButton = document.getElementById("web-hero-restart");
+  const returnButton = document.getElementById("web-hero-return");
+  const finalScoreEl = document.getElementById("web-hero-final-score");
+  const finalTimeEl = document.getElementById("web-hero-final-time");
+  const finalAccuracyEl = document.getElementById("web-hero-final-accuracy");
+  const finalNotesEl = document.getElementById("web-hero-final-notes");
+  const finalHitsEl = document.getElementById("web-hero-final-hits");
+  const finalStreakEl = document.getElementById("web-hero-final-streak");
+  const finalDelayEl = document.getElementById("web-hero-final-delay");
+  const gameOverTitleEl = document.getElementById("web-hero-result-title");
+  const lyricsEl = document.getElementById("web-hero-lyrics");
   let lyricSpans = [];
   const state = {
     running: false,
@@ -119,9 +105,13 @@ export function initPdeHero(socket = null) {
     scoreMultiplier: 1,
   };
 
-  let trackBounds = { center: 0, x: 0, width: 0, laneWidth: 0 };
-  const laneCenters = new Array(5);
-  let keys = loadKeys();
+  let keys = loadKeys(localStorage, "web-hero-keys", DEFAULT_KEYS);
+  const { draw, getLaneBounds, getTrackBounds, resize } = createGameRenderer({
+    canvas,
+    state,
+    keys,
+    colors: COLORS,
+  });
   let savedSettings = {};
   let importedChartSource = null;
   let audioContext = null;
@@ -139,8 +129,8 @@ export function initPdeHero(socket = null) {
     )
       savedSettings = parsedSettings;
   } catch (error) {
-    console.error("Impossible de lire les paramètres PDE Hero.", error);
-    statusEl.textContent = "Paramètres PDE Hero locaux illisibles.";
+    console.error("Impossible de lire les paramètres Web Hero.", error);
+    statusEl.textContent = "Paramètres Web Hero locaux illisibles.";
   }
   if (DIFFICULTIES[savedSettings.difficulty]) {
     difficultySelect.value = savedSettings.difficulty;
@@ -163,14 +153,19 @@ export function initPdeHero(socket = null) {
     typeof savedSettings.importedChart?.content === "string"
   ) {
     try {
-      state.chart = savedSettings.importedChart.format === "midi"
-        ? parsePdeHeroMidi(decodeMidi(savedSettings.importedChart.content))
-        : parsePdeHeroChart(savedSettings.importedChart.content);
+      state.chart =
+        savedSettings.importedChart.format === "midi"
+          ? parseWebHeroMidi(decodeMidi(savedSettings.importedChart.content))
+          : parseWebHeroChart(savedSettings.importedChart.content);
       importedChartSource = savedSettings.importedChart;
       statusEl.textContent = `${importedChartSource.name} chargé depuis les paramètres locaux, sans bande-son.`;
     } catch (error) {
-      console.error("La dernière chart PDE Hero sauvegardée est invalide.", error);
-      statusEl.textContent = "La dernière chart PDE Hero sauvegardée est invalide.";
+      console.error(
+        "La dernière chart Web Hero sauvegardée est invalide.",
+        error,
+      );
+      statusEl.textContent =
+        "La dernière chart Web Hero sauvegardée est invalide.";
     }
   }
 
@@ -186,9 +181,13 @@ export function initPdeHero(socket = null) {
         }),
       );
     } catch (error) {
-      console.error("Impossible de sauvegarder les paramètres PDE Hero.", error);
+      console.error(
+        "Impossible de sauvegarder les paramètres Web Hero.",
+        error,
+      );
       if (!state.running)
-        statusEl.textContent = "Impossible de sauvegarder les paramètres PDE Hero localement.";
+        statusEl.textContent =
+          "Impossible de sauvegarder les paramètres Web Hero localement.";
     }
   }
 
@@ -197,17 +196,6 @@ export function initPdeHero(socket = null) {
     difficultySelect.disabled = disabled;
     chartSpeedInput.disabled = disabled;
     hyperspeedInput.disabled = disabled;
-  }
-
-  function selectChartTrack(chart, difficulty) {
-    const wanted = DIFFICULTY_ORDER.indexOf(difficulty);
-    const [trackDifficulty, track] = Object.entries(chart.tracks)
-      .sort(
-        ([a], [b]) =>
-          Math.abs(DIFFICULTY_ORDER.indexOf(a) - wanted) -
-          Math.abs(DIFFICULTY_ORDER.indexOf(b) - wanted),
-      )[0];
-    return { difficulty: trackDifficulty, track };
   }
 
   keyInputs.forEach((input, index) => {
@@ -220,276 +208,9 @@ export function initPdeHero(socket = null) {
       }
       keys[index] = value;
       input.value = value.toUpperCase();
-      localStorage.setItem("pde-hero-keys", JSON.stringify(keys));
+      localStorage.setItem("web-hero-keys", JSON.stringify(keys));
     });
   });
-
-  function loadKeys() {
-    try {
-      const saved = JSON.parse(localStorage.getItem("pde-hero-keys"));
-      if (
-        Array.isArray(saved) &&
-        saved.length === 5 &&
-        new Set(saved).size === 5
-      ) {
-        return saved;
-      }
-    } catch {}
-    return DEFAULT_KEYS.slice();
-  }
-
-  function resize() {
-    const width = Math.max(1, canvas.parentElement.clientWidth);
-    const height = Math.max(1, canvas.parentElement.clientHeight);
-    const ratio = Math.min(
-      window.devicePixelRatio || 1,
-      2,
-      Math.sqrt(2_500_000 / (width * height)),
-    );
-
-    canvas.style.width = "100%";
-    canvas.style.height = "100%";
-    state.viewWidth = width;
-    state.viewHeight = height;
-    const trackWidth = width * 0.68;
-    trackBounds = {
-      center: width / 2,
-      x: (width - trackWidth) / 2,
-      width: trackWidth,
-      laneWidth: trackWidth / 5,
-    };
-    for (let lane = 0; lane < 5; lane++)
-      laneCenters[lane] = trackBounds.x + (lane + 0.5) * trackBounds.laneWidth;
-    const pixelWidth = Math.round(width * ratio);
-    const pixelHeight = Math.round(height * ratio);
-    if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
-      canvas.width = pixelWidth;
-      canvas.height = pixelHeight;
-    }
-    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-    draw(performance.now());
-  }
-
-  function getTrackBounds() {
-    return trackBounds;
-  }
-
-  function getLaneBounds(lane) {
-    const track = getTrackBounds();
-    return {
-      center: track.x + (lane + 0.5) * track.laneWidth,
-      width: track.laneWidth,
-    };
-  }
-
-  function draw(now) {
-    const width = state.viewWidth;
-    const height = state.viewHeight;
-    ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = "#080808";
-    ctx.fillRect(0, 0, width, height);
-    const { x: trackX, width: trackWidth, laneWidth } = getTrackBounds();
-    const hitY = height - 48;
-    const topY = Math.max(0, height * 0.05);
-
-    ctx.fillStyle = "#000";
-    ctx.fillRect(trackX, topY, trackWidth, height - topY);
-    for (let lane = 0; lane < 5; lane++) {
-      const laneX = trackX + lane * laneWidth;
-      ctx.fillStyle =
-        lane % 2 ? "rgba(255,255,255,.035)" : "rgba(255,255,255,.07)";
-      ctx.fillRect(laneX, topY, laneWidth, height - topY);
-      ctx.strokeStyle = "rgba(255,255,255,.18)";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(laneX, topY);
-      ctx.lineTo(laneX, height);
-      ctx.stroke();
-    }
-    ctx.strokeStyle = "rgba(210,220,235,.48)";
-    ctx.lineWidth = 3;
-    ctx.strokeRect(trackX, topY, trackWidth, height - topY);
-
-    const { width: hitLaneWidth } = getLaneBounds(0);
-    const targetRadius = Math.max(0, Math.min(24, hitLaneWidth / 2 - 5));
-
-    for (let lane = 0; lane < 5; lane++) {
-      const cx = trackX + (lane + 0.5) * laneWidth;
-      ctx.strokeStyle = COLORS[lane];
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(cx, hitY, targetRadius, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.fillStyle = COLORS[lane];
-      ctx.font = `bold ${Math.max(12, Math.min(18, targetRadius * 1.05))}px sans-serif`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(keys[lane].toUpperCase(), cx, hitY);
-    }
-
-    state.notes.forEach((note) => {
-      const progress = Math.max(0, (now - note.spawnAt) / note.travelTime);
-      const y = note.hitRegistered ? hitY : progress * hitY;
-      const x = trackX + (note.lane + 0.5) * laneWidth;
-      const radius = Math.max(0, Math.min(20, laneWidth / 2 - 6));
-      if (note.sustain > 0) {
-        const sustainHeadY = Math.max(topY, y);
-        const tailY = Math.max(
-          topY,
-          Math.min(
-            sustainHeadY,
-            note.hitRegistered
-              ? hitY - ((note.sustainEndAt - now) / note.travelTime) * hitY
-              : y - (note.sustain / (note.travelTime / 1000)) * hitY,
-          ),
-        );
-        const tailX = x;
-        const tailHalfWidth = Math.max(2, radius * 0.28);
-        const noteHalfWidth = Math.max(2, radius * 0.28);
-        ctx.globalAlpha = note.releasedAt ? 0.22 : 0.55;
-        ctx.fillStyle = COLORS[note.lane];
-        ctx.beginPath();
-        ctx.moveTo(tailX - tailHalfWidth, tailY);
-        ctx.lineTo(tailX + tailHalfWidth, tailY);
-        ctx.lineTo(x + noteHalfWidth, sustainHeadY);
-        ctx.lineTo(x - noteHalfWidth, sustainHeadY);
-        ctx.closePath();
-        ctx.fill();
-        ctx.globalAlpha = 1;
-      }
-      ctx.fillStyle = COLORS[note.lane];
-      ctx.beginPath();
-      ctx.arc(x, y, radius, 0, Math.PI * 2);
-      ctx.fill();
-    });
-    if (state.running) {
-      const hudX = trackX + trackWidth + width * 0.012;
-      const hudWidth = Math.max(1, width - hudX - width * 0.05);
-      const songProgress = Math.min(
-        1,
-        Math.max(0, (now - state.startedAt) / (state.chartDuration * 1000)),
-      );
-      const barY = height * 0.1;
-      const barHeight = Math.max(6, height * 0.016);
-      ctx.fillStyle = "rgba(255,255,255,.22)";
-      ctx.fillRect(hudX, barY, hudWidth, barHeight);
-      ctx.fillStyle = "#ffd400";
-      ctx.fillRect(hudX, barY, hudWidth * songProgress, barHeight);
-      const presenceY = barY + barHeight + 5;
-      const presenceHeight = Math.max(4, barHeight * 0.65);
-      ctx.fillStyle = "rgba(255,255,255,.22)";
-      ctx.fillRect(hudX, presenceY, hudWidth, presenceHeight);
-      ctx.fillStyle = "#ffd400";
-      ctx.fillRect(
-        hudX,
-        presenceY,
-        hudWidth * Math.max(0, Math.min(100, state.stagePresence)) / 100,
-        presenceHeight,
-      );
-
-      ctx.textAlign = "right";
-      ctx.textBaseline = "middle";
-      ctx.fillStyle = "#fff";
-      ctx.font = `800 ${Math.max(14, Math.min(34, width * 0.035))}px sans-serif`;
-      ctx.fillText(state.score.toLocaleString(), hudX + hudWidth, height * 0.19);
-
-      const multiplierProgress = state.multiplier === 4 ? 10 : state.combo % 10;
-      const segmentGap = 2;
-      const orbRadius = Math.min(24, width * 0.045, height * 0.07);
-      const orbX = trackX + trackWidth;
-      const orbY = (topY + height - 48) / 2;
-      const segmentWidth = Math.min(8, Math.max(4, width * 0.012));
-      const segmentHeight = Math.max(3, Math.min(7, height * 0.012));
-      const segmentsHeight = segmentHeight * 10 + segmentGap * 9;
-      const segmentsX = orbX - segmentWidth / 2;
-      const segmentsY = orbY - orbRadius - 5 - segmentsHeight;
-      ctx.fillStyle = "#000";
-      for (let i = 0; i < 10; i++) {
-        ctx.fillRect(
-          segmentsX,
-          segmentsY + (9 - i) * (segmentHeight + segmentGap),
-          segmentWidth,
-          segmentHeight,
-        );
-      }
-      ctx.fillStyle = "#ffd400";
-      for (let i = 0; i < multiplierProgress; i++) {
-        ctx.fillRect(
-          segmentsX,
-          segmentsY + (9 - i) * (segmentHeight + segmentGap),
-          segmentWidth,
-          segmentHeight,
-        );
-      }
-      ctx.beginPath();
-      ctx.arc(orbX, orbY, orbRadius, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(12,8,20,.9)";
-      ctx.fill();
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = "#ffd400";
-      ctx.stroke();
-      ctx.fillStyle = "#ffd400";
-      ctx.textAlign = "center";
-      ctx.font = `bold ${Math.max(10, orbRadius * 1.05)}px sans-serif`;
-      ctx.fillText(`x${state.multiplier}`, orbX, orbY);
-      const canvasLabel =
-        `PDE Hero. Score ${state.score}. Série ${state.combo}. Multiplicateur x${state.multiplier}. Progression ${Math.floor(songProgress * 100)}%. Stage presence ${state.stagePresence}%.`;
-      if (canvas.getAttribute("aria-label") !== canvasLabel)
-        canvas.setAttribute("aria-label", canvasLabel);
-    }
-    const flashRemaining = Math.max(0, state.missFlashUntil - now);
-    if (flashRemaining > 0) {
-      ctx.fillStyle = `rgba(220, 25, 35, ${0.3 * (flashRemaining / 180)})`;
-      ctx.fillRect(0, 0, width, height);
-    }
-    let visibleParticles = 0;
-    for (const particle of state.particles) {
-      if (now - particle.createdAt < particle.duration)
-        state.particles[visibleParticles++] = particle;
-    }
-    state.particles.length = visibleParticles;
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-    for (const particle of state.particles) {
-      const progress = Math.max(0, (now - particle.createdAt) / particle.duration);
-      const x = particle.x + particle.vx * progress;
-      const y = particle.y + particle.vy * progress + progress * progress * 35;
-      const radius = Math.max(2.5, particle.size * (1 - progress * 0.35));
-      ctx.globalAlpha = Math.max(0.35, 1 - progress);
-      ctx.fillStyle = particle.color;
-      ctx.beginPath();
-      ctx.arc(x, y, radius, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
-    const activePause = state.longPauses.find(
-      (pause) => now >= pause.startAt && now < pause.endAt,
-    );
-    if (activePause) {
-      const secondsUntilNextNote = Math.ceil(
-        (activePause.nextNoteAt - now) / 1000,
-      );
-      const centerX = trackX + trackWidth / 2;
-      const centerY = (topY + hitY) / 2;
-      const panelWidth = Math.min(trackWidth * 0.72, 300);
-      const panelHeight = Math.max(76, height * 0.19);
-      ctx.fillStyle = "rgba(0,0,0,.82)";
-      ctx.fillRect(
-        centerX - panelWidth / 2,
-        centerY - panelHeight / 2,
-        panelWidth,
-        panelHeight,
-      );
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillStyle = "#fff";
-      ctx.font = `bold ${Math.max(12, Math.min(18, width * 0.022))}px sans-serif`;
-      ctx.fillText("PROCHAINE NOTE", centerX, centerY - panelHeight * 0.22);
-      ctx.fillStyle = "#ffd400";
-      ctx.font = `800 ${Math.max(24, Math.min(48, width * 0.06))}px sans-serif`;
-      ctx.fillText(`${secondsUntilNextNote}`, centerX, centerY + panelHeight * 0.2);
-    }
-  }
 
   function updateLyrics() {
     const lyric = state.lyrics[state.lyricIndex];
@@ -513,7 +234,8 @@ export function initPdeHero(socket = null) {
       state.lyricPhraseIndex = phraseIndex;
       state.lyricActiveIndex = -1;
     }
-    const activeIndex = state.lyricIndex - state.lyricPhrases[phraseIndex].startIndex;
+    const activeIndex =
+      state.lyricIndex - state.lyricPhrases[phraseIndex].startIndex;
     if (activeIndex !== state.lyricActiveIndex) {
       lyricSpans.forEach((span, index) =>
         span.classList.toggle("is-active", index <= activeIndex),
@@ -579,13 +301,13 @@ export function initPdeHero(socket = null) {
         note.hitRegistered
           ? !note.holding && now >= note.sustainEndAt
           : note.missAt < now
-      ) state.notes.splice(index, 1);
+      )
+        state.notes.splice(index, 1);
     }
     if (
       state.pendingNotes.length === 0 &&
       state.notes.length === 0 &&
-      now >=
-        state.startedAt + state.chartDuration * 1000 + timePastHitZone
+      now >= state.startedAt + state.chartDuration * 1000 + timePastHitZone
     ) {
       finish("Chart terminée", { completed: true });
       return;
@@ -609,7 +331,10 @@ export function initPdeHero(socket = null) {
     state.maxCombo = Math.max(state.maxCombo, state.combo);
     state.combo = 0;
     state.multiplier = 1;
-    state.stagePresence = adjustPdeHeroStagePresence(state.stagePresence, false);
+    state.stagePresence = adjustWebHeroStagePresence(
+      state.stagePresence,
+      false,
+    );
     state.missFlashUntil = performance.now() + 180;
     if (state.stagePresence <= 0) {
       finish("Stage presence épuisée");
@@ -653,9 +378,10 @@ export function initPdeHero(socket = null) {
     stopButton.hidden = true;
     statusEl.textContent = `${message} - ${state.score} points`;
     const finalDuration = Math.floor(duration);
-    const accuracy = state.hits + state.misses
-      ? Math.round((state.hits / (state.hits + state.misses)) * 100)
-      : 0;
+    const accuracy =
+      state.hits + state.misses
+        ? Math.round((state.hits / (state.hits + state.misses)) * 100)
+        : 0;
     gameOverTitleEl.textContent = completed
       ? "CHART TERMINÉE"
       : stopped
@@ -663,12 +389,11 @@ export function initPdeHero(socket = null) {
         : "GAME OVER";
     gameOverEl.classList.toggle("is-completed", completed);
     gameOverEl.classList.toggle("is-stopped", stopped);
-    document.getElementById("pde-hero-result-subtitle").textContent =
-      completed
-        ? "Chart terminée. Beau jeu !"
-        : stopped
-          ? "Session arrêtée. Ton score n’a pas été enregistré."
-          : "La prochaine sera la bonne.";
+    document.getElementById("web-hero-result-subtitle").textContent = completed
+      ? "Chart terminée. Beau jeu !"
+      : stopped
+        ? "Session arrêtée. Ton score n’a pas été enregistré."
+        : "La prochaine sera la bonne.";
     finalScoreEl.textContent = state.score.toLocaleString("fr-FR");
     finalTimeEl.textContent = `${finalDuration}s`;
     finalAccuracyEl.textContent = `${accuracy}%`;
@@ -678,14 +403,15 @@ export function initPdeHero(socket = null) {
     const averageHitDelay = state.hits
       ? Math.round(state.hitDelayTotal / state.hits)
       : null;
-    finalDelayEl.textContent = averageHitDelay === null
-      ? "—"
-      : `${averageHitDelay > 0 ? "+" : ""}${averageHitDelay} ms`;
+    finalDelayEl.textContent =
+      averageHitDelay === null
+        ? "—"
+        : `${averageHitDelay > 0 ? "+" : ""}${averageHitDelay} ms`;
     gameOverEl.hidden = false;
     restartButton.focus();
     setChartControlsDisabled(false);
     if (completed && socket) {
-      socket.emit("pdehero:final", {
+      socket.emit("webhero:final", {
         score: state.score,
         duration,
         difficulty: state.chartDifficulty,
@@ -730,20 +456,18 @@ export function initPdeHero(socket = null) {
     );
     const chartSpeed = Number(chartSpeedInput.value);
     const hyperspeed = Number(hyperspeedInput.value);
-    const travelTime =
-      DIFFICULTIES[state.difficulty].travelTime /
-      hyperspeed;
+    const travelTime = DIFFICULTIES[state.difficulty].travelTime / hyperspeed;
     const startAt = performance.now() + travelTime;
     const audioStartAt = audioBuffers.length
       ? audioContext.currentTime + travelTime / 1000
       : null;
-    const schedule = schedulePdeHeroTrack(
+    const schedule = scheduleWebHeroTrack(
       chartTrack,
       startAt,
       travelTime,
       chartSpeed,
     );
-    state.longPauses = schedulePdeHeroLongPauses(
+    state.longPauses = scheduleWebHeroLongPauses(
       chartTrack,
       schedule.startAt,
       chartSpeed,
@@ -764,7 +488,7 @@ export function initPdeHero(socket = null) {
     state.stagePresence = 80;
     state.totalNotes = schedule.notes.length;
     state.chartDifficulty = chartDifficulty;
-    state.scoreMultiplier = getPdeHeroScoreMultiplier(
+    state.scoreMultiplier = getWebHeroScoreMultiplier(
       chartDifficulty,
       chartSpeed,
       hyperspeed,
@@ -774,12 +498,12 @@ export function initPdeHero(socket = null) {
     state.travelTime = travelTime;
     state.startedAt = schedule.startAt;
     state.pendingNotes = schedule.notes;
-    state.lyrics = schedulePdeHeroLyrics(
+    state.lyrics = scheduleWebHeroLyrics(
       state.chart.lyrics || [],
       schedule.startAt,
       chartSpeed,
     );
-    state.lyricPhrases = groupPdeHeroLyrics(state.lyrics);
+    state.lyricPhrases = groupWebHeroLyrics(state.lyrics);
     state.lyricIndex = -1;
     state.lyricPhraseIndex = -1;
     state.lyricActiveIndex = -1;
@@ -826,8 +550,8 @@ export function initPdeHero(socket = null) {
     state.hitDelayTotal += now - hitNote.hitAt;
     state.combo += 1;
     state.maxCombo = Math.max(state.maxCombo, state.combo);
-    state.multiplier = getPdeHeroMultiplier(state.combo);
-    state.stagePresence = adjustPdeHeroStagePresence(state.stagePresence, true);
+    state.multiplier = getWebHeroMultiplier(state.combo);
+    state.stagePresence = adjustWebHeroStagePresence(state.stagePresence, true);
     state.score += Math.round(100 * state.multiplier * state.scoreMultiplier);
     const { laneWidth, center: laneCenter } = getLaneBounds(lane);
     state.particles.push(
@@ -851,12 +575,12 @@ export function initPdeHero(socket = null) {
     );
     const scoredSeconds = note.sustainScoredSeconds || 0;
     state.score +=
-      getPdeHeroSustainBonus(
+      getWebHeroSustainBonus(
         heldSeconds,
         note.holdMultiplier,
         state.scoreMultiplier,
       ) -
-      getPdeHeroSustainBonus(
+      getWebHeroSustainBonus(
         scoredSeconds,
         note.holdMultiplier,
         state.scoreMultiplier,
@@ -875,7 +599,11 @@ export function initPdeHero(socket = null) {
   function hit(key) {
     if (!state.running) return;
     const now = performance.now();
-    if (state.longPauses.some((pause) => now >= pause.startAt && now < pause.endAt))
+    if (
+      state.longPauses.some(
+        (pause) => now >= pause.startAt && now < pause.endAt,
+      )
+    )
       return;
     const lane = keys.indexOf(key.toLowerCase());
     if (lane < 0) {
@@ -891,8 +619,11 @@ export function initPdeHero(socket = null) {
       return;
     }
     const index = state.notes.findIndex(
-      (note) => !note.hitRegistered &&
-        note.lane === lane && now >= note.hitAt - 280 && now <= note.missAt,
+      (note) =>
+        !note.hitRegistered &&
+        note.lane === lane &&
+        now >= note.hitAt - 280 &&
+        now <= note.missAt,
     );
     if (index < 0) {
       registerOverHit();
@@ -926,6 +657,7 @@ export function initPdeHero(socket = null) {
 
   const heldTouchPointers = new Map();
   const heldTouchLanes = new Map();
+  const heldCanvasPointers = new Map();
   document.querySelectorAll(".touch-lane").forEach((button, lane) => {
     const finishTouch = (event) => {
       if (heldTouchPointers.get(event.pointerId) !== lane) return;
@@ -959,6 +691,48 @@ export function initPdeHero(socket = null) {
       release(keys[lane]);
     });
   });
+  const finishCanvasTouch = (event) => {
+    const lane = heldCanvasPointers.get(event.pointerId);
+    if (lane === undefined) return;
+    heldCanvasPointers.delete(event.pointerId);
+    const pointers = heldTouchLanes.get(lane);
+    pointers.delete(event.pointerId);
+    if (pointers.size === 0) {
+      heldTouchLanes.delete(lane);
+      release(keys[lane]);
+    }
+  };
+  canvas.addEventListener("pointerdown", (event) => {
+    if (event.pointerType !== "touch" || !state.running) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) * state.viewWidth) / rect.width;
+    const y = ((event.clientY - rect.top) * state.viewHeight) / rect.height;
+    const track = getTrackBounds();
+    const lane = Math.floor((x - track.x) / track.laneWidth);
+    const targetRadius = Math.min(24, track.laneWidth / 2 - 5);
+    const touchRadius = Math.min(
+      track.laneWidth / 2,
+      Math.max(24, targetRadius + 8),
+    );
+    if (
+      x < track.x ||
+      x >= track.x + track.width ||
+      lane < 0 ||
+      lane >= 5 ||
+      Math.abs(y - (state.viewHeight - 48)) > touchRadius
+    )
+      return;
+    event.preventDefault();
+    const pointers = heldTouchLanes.get(lane) || new Set();
+    if (pointers.size === 0) hit(keys[lane]);
+    pointers.add(event.pointerId);
+    heldTouchLanes.set(lane, pointers);
+    heldCanvasPointers.set(event.pointerId, lane);
+    canvas.setPointerCapture(event.pointerId);
+  });
+  canvas.addEventListener("pointerup", finishCanvasTouch);
+  canvas.addEventListener("pointercancel", finishCanvasTouch);
+  canvas.addEventListener("lostpointercapture", finishCanvasTouch);
 
   startButton.addEventListener("click", start);
   stopButton.addEventListener("click", () =>
@@ -983,17 +757,19 @@ export function initPdeHero(socket = null) {
     startButton.focus({ preventScroll: true });
   });
   chartImportButton.addEventListener("click", () => chartFileInput.click());
-  document.getElementById("fullscreen-button")?.addEventListener("click", async () => {
-    try {
-      if (document.fullscreenElement) {
-        await document.exitFullscreen();
-      } else {
-        await stage.requestFullscreen();
+  document
+    .getElementById("fullscreen-button")
+    ?.addEventListener("click", async () => {
+      try {
+        if (document.fullscreenElement) {
+          await document.exitFullscreen();
+        } else {
+          await stage.requestFullscreen();
+        }
+      } catch (error) {
+        statusEl.textContent = `Plein écran indisponible : ${error.message}`;
       }
-    } catch (error) {
-      statusEl.textContent = `Plein écran indisponible : ${error.message}`;
-    }
-  });
+    });
   chartSpeedInput.addEventListener("input", () => {
     chartSpeedValue.value = `${Math.round(Number(chartSpeedInput.value) * 100)} %`;
     saveSettings();
@@ -1006,9 +782,14 @@ export function initPdeHero(socket = null) {
     const files = [...chartFileInput.files];
     if (!files.length) return;
     try {
-      if (state.running) throw new Error("Terminez la partie avant d’importer.");
-      const { chartFile: file, audioFiles, iniFile, folderName } =
-        selectChartFolderFiles(files);
+      if (state.running)
+        throw new Error("Terminez la partie avant d’importer.");
+      const {
+        chartFile: file,
+        audioFiles,
+        iniFile,
+        folderName,
+      } = selectChartFolderFiles(files);
       const extension = file.name.split(".").pop().toLowerCase();
       let chart;
       let source;
@@ -1017,11 +798,11 @@ export function initPdeHero(socket = null) {
         : folderName;
       if (extension === "chart") {
         const content = await file.text();
-        chart = parsePdeHeroChart(content);
+        chart = parseWebHeroChart(content);
         source = { name: songName, content, format: "chart" };
       } else {
         const content = await file.arrayBuffer();
-        chart = parsePdeHeroMidi(content);
+        chart = parseWebHeroMidi(content);
         source = {
           name: songName,
           content: encodeMidi(content),
@@ -1073,7 +854,13 @@ export function initPdeHero(socket = null) {
   resize();
   draw(0);
   if (!state.chart)
-    statusEl.textContent = "Importez une chart .chart/.mid, avec ses fichiers audio pour jouer en musique.";
+    statusEl.textContent =
+      "Importez une chart .chart/.mid, avec ses fichiers audio pour jouer en musique.";
+  if (canvas) canvas.focus();
+  alert(
+    "Conseil",
+    "Sur PC, utilisez l'option de plein écran pour une meilleure expérience.",
+  );
 }
 
-initPdeHero();
+initWebHero();

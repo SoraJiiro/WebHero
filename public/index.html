@@ -4,12 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#080808" />
-    <meta name="description" content="Joue à WebHero, un jeu de rythme gratuit inspiré de Guitar Hero. Lance une chart, règle la difficulté et joue au clavier ou sur écran tactile." />
+    <meta name="description"
+      content="Joue à WebHero, un jeu de rythme gratuit inspiré de Guitar Hero. Lance une chart, règle la difficulté et joue au clavier ou sur écran tactile." />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="fr_FR" />
     <meta property="og:title" content="WebHero — jeu de rythme" />
-    <meta property="og:description" content="Un jeu de rythme gratuit inspiré de Guitar Hero, jouable au clavier ou sur écran tactile." />
+    <meta property="og:description"
+      content="Un jeu de rythme gratuit inspiré de Guitar Hero, jouable au clavier ou sur écran tactile." />
+    <meta property="og:image" content="./assets/imgs/WH-LOGO.webp" />
     <meta name="twitter:card" content="summary" />
+    <link rel="icon" type="image/svg+xml" href="./assets/imgs/WH-LOGO.svg" />
     <title>WebHero — jeu de rythme gratuit</title>
     <link rel="stylesheet" href="./css/styles.css" />
   </head>
@@ -18,83 +22,124 @@
     <div id="stage22" class="app-shell">
       <header class="topbar">
         <div class="brand-block">
-          <span class="brand-symbol" aria-hidden="true"><i class="fa-solid fa-bolt"></i></span>
+          <img class="brand-symbol" src="./assets/imgs/WH-LOGO.svg" alt
+            aria-hidden="true" />
           <div>
             <span class="brand-kicker">ARCADE · RHYTHM GAME</span>
             <h1>WEB<span>HERO</span></h1>
           </div>
         </div>
 
-        <div class="toolbar" role="group" aria-label="Configuration de la partie">
+        <div class="toolbar" role="group"
+          aria-label="Configuration de la partie">
           <label class="field difficulty-field">
-            <span><i class="fa-solid fa-gauge-high" aria-hidden="true"></i> Difficulté</span>
-            <select id="pde-hero-difficulty">
+            <span><i class="fa-solid fa-gauge-high" aria-hidden="true"></i>
+              Difficulté</span>
+            <select id="web-hero-difficulty" aria-label="Difficulté de la chart"
+              title="Choisir la difficulté">
               <option value="easy">Facile</option>
               <option value="medium" selected>Moyen</option>
               <option value="hard">Difficile</option>
               <option value="expert">Expert</option>
             </select>
           </label>
-          <button id="pde-hero-chart-import" type="button" aria-label="Importer un dossier de chart"><i class="fa-solid fa-folder-open" aria-hidden="true"></i> Importer un dossier</button>
-          <button id="fullscreen-button" class="ghost-button" type="button"><i class="fa-solid fa-expand" aria-hidden="true"></i> Plein écran</button>
-          <button id="pde-hero-start" class="primary-button" type="button"><i class="fa-solid fa-play" aria-hidden="true"></i> Jouer</button>
-          <button id="pde-hero-stop" type="button" hidden><i class="fa-solid fa-stop" aria-hidden="true"></i> Arrêter</button>
+          <button id="web-hero-chart-import" type="button"
+            aria-label="Importer un dossier de chart avec notes, fichier INI et pistes audio"
+            title="Importer le dossier d’une chart et ses pistes audio"><i
+              class="fa-solid fa-folder-open" aria-hidden="true"></i> Importer
+            un dossier</button>
+          <button id="fullscreen-button" class="ghost-button" type="button"
+            aria-label="Passer en plein écran (recommandé)"
+            title="Activer ou quitter le plein écran (recommandé)"><i
+              class="fa-solid fa-expand" aria-hidden="true"></i> Plein
+            écran</button>
+          <button id="web-hero-start" class="primary-button" type="button"
+            aria-label="Démarrer la partie" title="Jouer la chart importée"><i
+              class="fa-solid fa-play" aria-hidden="true"></i> Jouer</button>
+          <button id="web-hero-stop" type="button"
+            aria-label="Arrêter la partie" title="Arrêter la partie en cours"
+            hidden><i class="fa-solid fa-stop" aria-hidden="true"></i>
+            Arrêter</button>
         </div>
       </header>
 
-      <main id="game-area" class="arena-shell" aria-label="Jeu WebHero" tabindex="-1">
-        <div class="pde-hero-wrap">
-          <canvas id="pde-hero-canvas" tabindex="0" aria-label="Piste de jeu WebHero. Utilisez les touches D, F, J, K et L selon les lanes colorées." aria-describedby="pde-hero-instructions">Votre navigateur ne prend pas en charge le canvas.</canvas>
+      <main id="game-area" class="arena-shell" aria-label="Jeu WebHero"
+        tabindex="-1">
+        <div class="web-hero-wrap">
+          <canvas id="web-hero-canvas" tabindex="0"
+            aria-label="Piste de jeu WebHero. Utilisez les touches D, F, J, K et L selon les lanes colorées."
+            aria-describedby="web-hero-instructions">Votre navigateur ne prend
+            pas en charge le canvas.</canvas>
           <div class="arena-idle" aria-hidden="true">
             <span class="idle-eyebrow">WEBHERO · PRÊT À JOUER</span>
             <span class="idle-title">À TOI DE JOUER<span>.</span></span>
-            <span class="idle-caption">Choisis un morceau, puis lance la partie.</span>
-            <span class="idle-signal"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+            <span class="idle-caption">Importe le dossier d’une chart, puis
+              lance la partie.</span>
+            <span
+              class="idle-signal"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
           </div>
-          <p id="pde-hero-instructions" class="visually-hidden">Choisissez une chart et une difficulté, puis appuyez sur Jouer. Appuyez sur les touches D, F, J, K et L lorsque les notes atteignent la ligne de frappe, ou utilisez les boutons tactiles.</p>
-          <div id="pde-hero-lyrics" class="lyrics" aria-live="polite" hidden></div>
-          <section id="pde-hero-game-over" class="game-over" role="dialog" aria-labelledby="pde-hero-result-title" aria-describedby="pde-hero-result-subtitle" hidden>
+          <p id="web-hero-instructions" class="visually-hidden">Choisissez une
+            chart et une difficulté, puis appuyez sur Jouer. Appuyez sur les
+            touches D, F, J, K et L lorsque les notes atteignent la ligne de
+            frappe, ou utilisez les boutons tactiles.</p>
+          <div id="web-hero-lyrics" class="lyrics" aria-live="polite"
+            hidden></div>
+          <section id="web-hero-game-over" class="game-over" role="dialog"
+            aria-labelledby="web-hero-result-title"
+            aria-describedby="web-hero-result-subtitle" hidden>
             <div class="game-over-card">
               <div class="result-heading">
-                <span id="pde-hero-result-kicker">SESSION TERMINÉE</span>
-                <h2 id="pde-hero-result-title">GAME OVER</h2>
-                <p id="pde-hero-result-subtitle">La prochaine sera la bonne.</p>
+                <span id="web-hero-result-kicker">SESSION TERMINÉE</span>
+                <h2 id="web-hero-result-title">GAME OVER</h2>
+                <p id="web-hero-result-subtitle">La prochaine sera la bonne.</p>
               </div>
               <div class="result-score">
-                <span><i class="fa-solid fa-trophy" aria-hidden="true"></i> SCORE FINAL</span>
-                <strong id="pde-hero-final-score">0</strong>
+                <span><i class="fa-solid fa-trophy" aria-hidden="true"></i>
+                  SCORE FINAL</span>
+                <strong id="web-hero-final-score">0</strong>
               </div>
               <div class="result-stats">
                 <div class="result-stat result-accuracy">
-                  <span><i class="fa-solid fa-bullseye" aria-hidden="true"></i> Précision</span>
-                  <strong id="pde-hero-final-accuracy">0%</strong>
+                  <span><i class="fa-solid fa-bullseye" aria-hidden="true"></i>
+                    Précision</span>
+                  <strong id="web-hero-final-accuracy">0%</strong>
                 </div>
                 <div class="result-stat">
-                  <span><i class="fa-solid fa-clock" aria-hidden="true"></i> Durée</span>
-                  <strong id="pde-hero-final-time">0s</strong>
+                  <span><i class="fa-solid fa-clock" aria-hidden="true"></i>
+                    Durée</span>
+                  <strong id="web-hero-final-time">0s</strong>
                 </div>
                 <div class="result-stat">
-                  <span><i class="fa-solid fa-music" aria-hidden="true"></i> Notes</span>
-                  <strong id="pde-hero-final-notes">0</strong>
+                  <span><i class="fa-solid fa-music" aria-hidden="true"></i>
+                    Notes</span>
+                  <strong id="web-hero-final-notes">0</strong>
                 </div>
                 <div class="result-stat">
-                  <span><i class="fa-solid fa-check-double" aria-hidden="true"></i> Hits / Misses</span>
-                  <strong id="pde-hero-final-hits">0 / 0</strong>
+                  <span><i class="fa-solid fa-check-double"
+                      aria-hidden="true"></i> Hits / Misses</span>
+                  <strong id="web-hero-final-hits">0 / 0</strong>
                 </div>
                 <div class="result-stat result-delay">
-                  <span><i class="fa-solid fa-stopwatch" aria-hidden="true"></i> Délai moyen</span>
-                  <strong id="pde-hero-final-delay">—</strong>
+                  <span><i class="fa-solid fa-stopwatch" aria-hidden="true"></i>
+                    Délai moyen</span>
+                  <strong id="web-hero-final-delay">—</strong>
                 </div>
                 <div class="result-stat result-streak">
-                  <span><i class="fa-solid fa-fire" aria-hidden="true"></i> Meilleure série</span>
-                  <strong id="pde-hero-final-streak">0</strong>
+                  <span><i class="fa-solid fa-fire" aria-hidden="true"></i>
+                    Meilleure série</span>
+                  <strong id="web-hero-final-streak">0</strong>
                 </div>
               </div>
-              <button id="pde-hero-restart" class="result-replay" type="button">
-                <span>Rejouer</span><i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
+              <button id="web-hero-restart" class="result-replay" type="button"
+                aria-label="Rejouer la chart" title="Recommencer cette chart">
+                <span>Rejouer</span><i class="fa-solid fa-rotate-right"
+                  aria-hidden="true"></i>
               </button>
-              <button id="pde-hero-return" class="result-return" type="button">
-                <i class="fa-solid fa-arrow-left" aria-hidden="true"></i><span>Retour à l’écran titre</span>
+              <button id="web-hero-return" class="result-return" type="button"
+                aria-label="Retourner à l’écran titre sans rejouer"
+                title="Fermer les résultats et revenir à l’écran titre">
+                <i class="fa-solid fa-arrow-left"
+                  aria-hidden="true"></i><span>Retour à l’écran titre</span>
               </button>
             </div>
           </section>
@@ -103,39 +148,87 @@
 
       <footer class="bottom-bar">
         <div class="settings-row">
-          <span class="footer-section-label"><i class="fa-solid fa-sliders" aria-hidden="true"></i> Réglages</span>
+          <span class="footer-section-label"><i class="fa-solid fa-sliders"
+              aria-hidden="true"></i> Réglages</span>
           <label class="speed-control">
-            <span><i class="fa-solid fa-gauge-high" aria-hidden="true"></i> Vitesse</span>
-            <input id="pde-hero-chart-speed" type="range" min="0.5" max="1" step="0.05" value="0.75" aria-describedby="pde-hero-chart-speed-value" />
-            <output id="pde-hero-chart-speed-value" for="pde-hero-chart-speed">75 %</output>
+            <span><i class="fa-solid fa-gauge-high" aria-hidden="true"></i>
+              Vitesse</span>
+            <input id="web-hero-chart-speed" type="range" min="0.5" max="1"
+              step="0.05" value="0.75"
+              aria-label="Vitesse de lecture de la chart"
+              aria-describedby="web-hero-chart-speed-value"
+              title="Régler la vitesse de lecture" />
+            <output id="web-hero-chart-speed-value"
+              for="web-hero-chart-speed">75 %</output>
           </label>
           <label class="speed-control">
-            <span><i class="fa-solid fa-bolt" aria-hidden="true"></i> Hyperspeed</span>
-            <input id="pde-hero-hyperspeed" type="range" min="0.8" max="2.5" step="0.1" value="1.5" aria-describedby="pde-hero-hyperspeed-value" />
-            <output id="pde-hero-hyperspeed-value" for="pde-hero-hyperspeed">1.5×</output>
+            <span><i class="fa-solid fa-bolt" aria-hidden="true"></i>
+              Hyperspeed</span>
+            <input id="web-hero-hyperspeed" type="range" min="0.8" max="2.5"
+              step="0.1" value="1.5"
+              aria-label="Hyperspeed, espacement visuel des notes"
+              aria-describedby="web-hero-hyperspeed-value"
+              title="Régler l’espacement visuel des notes" />
+            <output id="web-hero-hyperspeed-value"
+              for="web-hero-hyperspeed">1.5×</output>
           </label>
-          <span id="pde-hero-status" role="status">Chargement de la bibliothèque…</span>
+          <span id="web-hero-status" role="status"><span
+              id="web-hero-status-text">Importe une chart pour
+              commencer.</span></span>
         </div>
-        <div class="key-row" role="group" aria-label="Configuration des touches de jeu">
-          <span class="footer-section-label"><i class="fa-regular fa-keyboard" aria-hidden="true"></i> Touches</span>
-          <label><span class="lane lane-0">●</span><input class="pde-hero-key" value="D" maxlength="1" aria-label="Touche lane rouge" /></label>
-          <label><span class="lane lane-1">●</span><input class="pde-hero-key" value="F" maxlength="1" aria-label="Touche lane orange" /></label>
-          <label><span class="lane lane-2">●</span><input class="pde-hero-key" value="J" maxlength="1" aria-label="Touche lane jaune" /></label>
-          <label><span class="lane lane-3">●</span><input class="pde-hero-key" value="K" maxlength="1" aria-label="Touche lane verte" /></label>
-          <label><span class="lane lane-4">●</span><input class="pde-hero-key" value="L" maxlength="1" aria-label="Touche lane bleue" /></label>
+        <div class="key-row" role="group"
+          aria-label="Configuration des touches de jeu">
+          <span class="footer-section-label"><i class="fa-regular fa-keyboard"
+              aria-hidden="true"></i> Touches</span>
+          <label><span class="lane lane-0" aria-hidden="true">●</span><input
+              class="web-hero-key" value="D" maxlength="1"
+              aria-label="Touche de jeu pour la lane rouge"
+              title="Modifier la touche de la lane rouge" /></label>
+          <label><span class="lane lane-1" aria-hidden="true">●</span><input
+              class="web-hero-key" value="F" maxlength="1"
+              aria-label="Touche de jeu pour la lane orange"
+              title="Modifier la touche de la lane orange" /></label>
+          <label><span class="lane lane-2" aria-hidden="true">●</span><input
+              class="web-hero-key" value="J" maxlength="1"
+              aria-label="Touche de jeu pour la lane jaune"
+              title="Modifier la touche de la lane jaune" /></label>
+          <label><span class="lane lane-3" aria-hidden="true">●</span><input
+              class="web-hero-key" value="K" maxlength="1"
+              aria-label="Touche de jeu pour la lane verte"
+              title="Modifier la touche de la lane verte" /></label>
+          <label><span class="lane lane-4" aria-hidden="true">●</span><input
+              class="web-hero-key" value="L" maxlength="1"
+              aria-label="Touche de jeu pour la lane bleue"
+              title="Modifier la touche de la lane bleue" /></label>
         </div>
         <div class="touch-controls" role="group" aria-label="Touches tactiles">
-          <button class="touch-lane lane-0" type="button" aria-label="Lane rouge"><span>●</span></button>
-          <button class="touch-lane lane-1" type="button" aria-label="Lane orange"><span>●</span></button>
-          <button class="touch-lane lane-2" type="button" aria-label="Lane jaune"><span>●</span></button>
-          <button class="touch-lane lane-3" type="button" aria-label="Lane verte"><span>●</span></button>
-          <button class="touch-lane lane-4" type="button" aria-label="Lane bleue"><span>●</span></button>
+          <button class="touch-lane lane-0" type="button"
+            aria-label="Jouer la lane rouge" title="Activer la lane rouge"><span
+              aria-hidden="true">●</span></button>
+          <button class="touch-lane lane-1" type="button"
+            aria-label="Jouer la lane orange"
+            title="Activer la lane orange"><span
+              aria-hidden="true">●</span></button>
+          <button class="touch-lane lane-2" type="button"
+            aria-label="Jouer la lane jaune" title="Activer la lane jaune"><span
+              aria-hidden="true">●</span></button>
+          <button class="touch-lane lane-3" type="button"
+            aria-label="Jouer la lane verte" title="Activer la lane verte"><span
+              aria-hidden="true">●</span></button>
+          <button class="touch-lane lane-4" type="button"
+            aria-label="Jouer la lane bleue" title="Activer la lane bleue"><span
+              aria-hidden="true">●</span></button>
         </div>
-        <input id="pde-hero-chart-file" type="file" accept=".chart,.mid,.midi,.ini,.aac,.flac,.m4a,.mp3,.ogg,.opus,.wav" webkitdirectory directory multiple hidden />
+        <input id="web-hero-chart-file" type="file"
+          aria-label="Sélectionner le dossier d’une chart, avec son fichier INI et ses pistes audio"
+          title="Sélectionner le dossier d’une seule chart"
+          accept=".chart,.mid,.midi,.ini,.aac,.flac,.m4a,.mp3,.ogg,.opus,.wav"
+          webkitdirectory directory multiple hidden />
       </footer>
     </div>
 
-    <script async src="https://kit.fontawesome.com/9a6b0f1631.js" crossorigin="anonymous"></script>
+    <script async src="https://kit.fontawesome.com/9a6b0f1631.js"
+      crossorigin="anonymous"></script>
     <script type="module" src="./js/game.js"></script>
   </body>
 </html>
