@@ -37,3 +37,48 @@ export function selectChartTrack(chart, difficulty, difficultyOrder) {
   )[0];
   return { difficulty: trackDifficulty, track };
 }
+
+export function getHoldTapLanes(targetLane, heldLanes, laneRanks) {
+  return [
+    targetLane,
+    ...heldLanes.filter(
+      (heldLane) => laneRanks[targetLane] > laneRanks[heldLane],
+    ),
+  ];
+}
+
+export function findHitNote(notes, lanes, now, earlyWindow = 280) {
+  let bestIndex = -1;
+  let bestDistance = Infinity;
+  let bestLanePriority = Infinity;
+  for (let index = 0; index < notes.length; index++) {
+    const note = notes[index];
+    const lanePriority = lanes.indexOf(note.lane);
+    if (
+      note.hitRegistered ||
+      lanePriority < 0 ||
+      now < note.hitAt - earlyWindow ||
+      now > note.missAt
+    ) continue;
+    const distance = Math.abs(now - note.hitAt);
+    if (
+      distance < bestDistance ||
+      (distance === bestDistance && lanePriority < bestLanePriority)
+    ) {
+      bestIndex = index;
+      bestDistance = distance;
+      bestLanePriority = lanePriority;
+    }
+  }
+  return bestIndex;
+}
+
+export function findAutoHitNote(notes, lane, now) {
+  return notes.findIndex(
+    (note) =>
+      note.lane === lane &&
+      !note.hitRegistered &&
+      now >= note.hitAt &&
+      now <= note.missAt,
+  );
+}

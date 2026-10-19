@@ -12,9 +12,18 @@ import {
 } from "./pde_hero_chart.mjs";
 import { parseSongIni, selectChartFolderFiles } from "./chart-import.mjs";
 import { createGameRenderer } from "./game-renderer.mjs";
-import { decodeMidi, encodeMidi, loadKeys, selectChartTrack } from "./utils.js";
+import {
+  decodeMidi,
+  encodeMidi,
+  findAutoHitNote,
+  findHitNote,
+  getHoldTapLanes,
+  loadKeys,
+  selectChartTrack,
+} from "./utils.js";
 
 const DEFAULT_KEYS = ["d", "f", "j", "k", "l"];
+const LANE_RANKS = [0, 1, 2, 3, 4];
 const SETTINGS_KEY = "web-hero-settings";
 const COLORS = ["#ff4f64", "#ffb347", "#ffe14a", "#63e6be", "#74a7ff"];
 const DIFFICULTIES = {
@@ -274,6 +283,24 @@ export function initWebHero(socket = null) {
     }
     for (let index = state.notes.length - 1; index >= 0; index--) {
       const note = state.notes[index];
+      if (!note.hitRegistered && autoHitLanes.has(note.lane)) {
+        const hitIndex = findAutoHitNote(state.notes, note.lane, now);
+        if (hitIndex === index) {
+          if (note.sustain > 0) {
+            note.holding = true;
+            note.hitRegistered = true;
+            note.holdMultiplier = state.multiplier;
+            note.sustainStartedAt = note.hitAt;
+            note.sustainScoredSeconds = 0;
+            note.sustainEndAt = note.hitAt + note.sustain * 1000;
+            registerHit(note, note.lane, note.hitAt);
+          } else {
+            state.notes.splice(index, 1);
+            registerHit(note, note.lane, note.hitAt);
+            continue;
+          }
+        }
+      }
       if (note.holding) {
         creditSustain(note, now);
         if (now >= note.sustainEndAt) endSustain(note, note.sustainEndAt);
@@ -389,11 +416,6 @@ export function initWebHero(socket = null) {
         : "GAME OVER";
     gameOverEl.classList.toggle("is-completed", completed);
     gameOverEl.classList.toggle("is-stopped", stopped);
-    document.getElementById("web-hero-result-subtitle").textContent = completed
-      ? "Chart terminée. Beau jeu !"
-      : stopped
-        ? "Session arrêtée. Ton score n’a pas été enregistré."
-        : "La prochaine sera la bonne.";
     finalScoreEl.textContent = state.score.toLocaleString("fr-FR");
     finalTimeEl.textContent = `${finalDuration}s`;
     finalAccuracyEl.textContent = `${accuracy}%`;
@@ -557,16 +579,16 @@ export function initWebHero(socket = null) {
     const { laneWidth, center: laneCenter } = getLaneBounds(lane);
     const fireColors = ["#fff7ae", "#ffd43b", "#ff8a24", "#ed4228"];
     state.particles.push(
-      ...Array.from({ length: 22 }, (_, index) => ({
-        x: laneCenter,
+      ...Array.from({ length: 16 }, (_, index) => ({
+        x: laneCenter + (Math.random() - 0.5) * laneWidth * 0.45,
         y: noteY,
-        vx: (Math.random() - 0.5) * laneWidth * 1.7,
-        vy: -(100 + Math.random() * 150),
-        size: 5 + Math.random() * 7,
+        vx: (Math.random() - 0.5) * laneWidth * 1.4,
+        vy: -(85 + Math.random() * 190),
+        size: 3 + Math.random() * 6,
         color: fireColors[index % fireColors.length],
         fire: true,
         createdAt: now,
-        duration: 420 + Math.random() * 300,
+        duration: 320 + Math.random() * 260,
       })),
     );
   }
@@ -599,7 +621,7 @@ export function initWebHero(socket = null) {
     note.releasedAt = endedAt;
   }
 
-  function hit(key) {
+  function hit(lane) {
     if (!state.running) return;
     const now = performance.now();
     if (
@@ -608,27 +630,20 @@ export function initWebHero(socket = null) {
       )
     )
       return;
-    const lane = keys.indexOf(key.toLowerCase());
     if (lane < 0) {
       registerMiss();
       return;
     }
-    const laneNote = state.notes.find(
-      (note) => note.lane === lane && !note.hitRegistered,
-    );
-    if (laneNote && !laneNote.holding && now > laneNote.missAt) {
-      state.notes.splice(state.notes.indexOf(laneNote), 1);
-      registerMiss();
-      return;
-    }
-    const index = state.notes.findIndex(
-      (note) =>
-        !note.hitRegistered &&
-        note.lane === lane &&
-        now >= note.hitAt - 280 &&
-        now <= note.missAt,
-    );
+    const index = findHitNote(state.notes, [lane], now);
     if (index < 0) {
+      const expiredIndex = state.notes.findIndex((note) =>
+        note.lane === lane && !note.hitRegistered && now > note.missAt
+      );
+      if (expiredIndex >= 0) {
+        state.notes.splice(expiredIndex, 1);
+        registerMiss();
+        return;
+      }
       registerOverHit();
       return;
     }
@@ -640,11 +655,24 @@ export function initWebHero(socket = null) {
       hitNote.sustainStartedAt = now;
       hitNote.sustainScoredSeconds = 0;
       hitNote.sustainEndAt = hitNote.hitAt + hitNote.sustain * 1000;
-      registerHit(hitNote, lane, now);
+      registerLaneHit(hitNote, hitNote.lane, now);
       return;
     }
     state.notes.splice(index, 1);
-    registerHit(hitNote, lane, now);
+    registerLaneHit(hitNote, hitNote.lane, now);
+  }
+
+  function registerLaneHit(note, lane, now) {
+    registerHit(note, lane, now);
+    for (
+      const heldLane of getHoldTapLanes(
+        lane,
+        getHeldLanes(),
+        LANE_RANKS,
+      ).slice(1)
+    ) {
+      autoHitLanes.add(heldLane);
+    }
   }
 
   function release(key) {
@@ -658,9 +686,36 @@ export function initWebHero(socket = null) {
     endSustain(note, Math.min(performance.now(), note.sustainEndAt));
   }
 
+  const heldKeyboardLanes = new Map();
   const heldTouchPointers = new Map();
   const heldTouchLanes = new Map();
   const heldCanvasPointers = new Map();
+  const autoHitLanes = new Set();
+  function getHeldLanes() {
+    return [...heldKeyboardLanes.values(), ...heldTouchLanes.keys()];
+  }
+  function pressLane(lane) {
+    hit(lane);
+  }
+  function clearHeldKeys() {
+    for (
+      const lane of new Set([
+        ...heldKeyboardLanes.values(),
+        ...heldTouchLanes.keys(),
+      ])
+    ) release(keys[lane]);
+    heldKeyboardLanes.clear();
+    heldTouchPointers.clear();
+    heldTouchLanes.clear();
+    heldCanvasPointers.clear();
+    document.querySelectorAll(".touch-lane.is-pressed").forEach((button) => {
+      button.classList.remove("is-pressed");
+    });
+    for (const lane of autoHitLanes) {
+      if (!getHeldLanes().includes(lane)) autoHitLanes.delete(lane);
+    }
+  }
+
   document.querySelectorAll(".touch-lane").forEach((button, lane) => {
     const finishTouch = (event) => {
       if (heldTouchPointers.get(event.pointerId) !== lane) return;
@@ -671,6 +726,7 @@ export function initWebHero(socket = null) {
         heldTouchLanes.delete(lane);
         button.classList.remove("is-pressed");
         release(keys[lane]);
+        if (!getHeldLanes().includes(lane)) autoHitLanes.delete(lane);
       }
     };
     button.addEventListener("pointerdown", (event) => {
@@ -678,7 +734,7 @@ export function initWebHero(socket = null) {
       if (event.button !== 0) return;
       if (heldTouchPointers.has(event.pointerId)) return;
       const pointers = heldTouchLanes.get(lane) || new Set();
-      if (pointers.size === 0) hit(keys[lane]);
+      if (pointers.size === 0) pressLane(lane);
       pointers.add(event.pointerId);
       heldTouchLanes.set(lane, pointers);
       heldTouchPointers.set(event.pointerId, lane);
@@ -690,7 +746,7 @@ export function initWebHero(socket = null) {
     button.addEventListener("lostpointercapture", finishTouch);
     button.addEventListener("click", (event) => {
       if (event.detail !== 0) return;
-      hit(keys[lane]);
+      pressLane(lane);
       release(keys[lane]);
     });
   });
@@ -703,6 +759,7 @@ export function initWebHero(socket = null) {
     if (pointers.size === 0) {
       heldTouchLanes.delete(lane);
       release(keys[lane]);
+      if (!getHeldLanes().includes(lane)) autoHitLanes.delete(lane);
     }
   };
   canvas.addEventListener("pointerdown", (event) => {
@@ -727,7 +784,7 @@ export function initWebHero(socket = null) {
       return;
     event.preventDefault();
     const pointers = heldTouchLanes.get(lane) || new Set();
-    if (pointers.size === 0) hit(keys[lane]);
+    if (pointers.size === 0) pressLane(lane);
     pointers.add(event.pointerId);
     heldTouchLanes.set(lane, pointers);
     heldCanvasPointers.set(event.pointerId, lane);
@@ -850,9 +907,28 @@ export function initWebHero(socket = null) {
   });
   window.addEventListener("keydown", (event) => {
     if (event.repeat || event.target.matches("input, textarea, select")) return;
-    hit(event.key);
+    const lane = keys.indexOf(event.key.toLowerCase());
+    if (lane < 0) {
+      hit(-1);
+      return;
+    }
+    pressLane(lane);
+    heldKeyboardLanes.set(event.code, lane);
   });
-  window.addEventListener("keyup", (event) => release(event.key));
+  window.addEventListener("keyup", (event) => {
+    const lane = heldKeyboardLanes.get(event.code);
+    if (lane === undefined) {
+      release(event.key);
+      return;
+    }
+    heldKeyboardLanes.delete(event.code);
+    release(keys[lane]);
+    if (!getHeldLanes().includes(lane)) autoHitLanes.delete(lane);
+  });
+  window.addEventListener("blur", clearHeldKeys);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) clearHeldKeys();
+  });
   window.addEventListener("resize", resize);
   new ResizeObserver(resize).observe(canvas.parentElement);
   resize();

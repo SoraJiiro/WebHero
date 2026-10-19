@@ -222,9 +222,9 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
         (now - particle.createdAt) / particle.duration,
       );
       const x = particle.x + particle.vx * progress;
-      const y = particle.y + particle.vy * progress + progress * progress * 35;
-      const radius = Math.max(2.5, particle.size * (1 - progress * 0.35));
-      ctx.globalAlpha = Math.max(0.35, 1 - progress);
+      const y = particle.y + particle.vy * progress + progress * progress * 55;
+      const radius = Math.max(0.8, particle.size * (1 - progress));
+      ctx.globalAlpha = (1 - progress) ** 1.4;
       ctx.fillStyle = particle.color;
       ctx.beginPath();
       if (particle.fire) {

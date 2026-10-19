@@ -451,11 +451,6 @@ button:disabled {
   letter-spacing: 0.08em;
   line-height: 1;
 }
-.result-heading p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
 .result-score {
   padding: 16px 12px 18px;
   border: 1px solid color-mix(in srgb, var(--result-accent), transparent 76%);
@@ -493,10 +488,7 @@ button:disabled {
 }
 .result-stat {
   min-width: 0;
-  padding: 12px 8px;
-  border: 1px solid rgba(255, 212, 0, 0.15);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.035);
+  padding: 8px 4px;
 }
 .result-stat strong {
   display: block;
