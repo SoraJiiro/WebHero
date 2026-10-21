@@ -142,9 +142,18 @@ export function parseWebHeroChart(text) {
       text: cleanLyric(text.replace(/\\"/g, '"')),
     }))
     .filter(({ text }) => text);
+  const sectionMarkers = [
+    ...(sections.get("events") || "").matchAll(
+      /^\s*(\d+)\s*=\s*E\s+"section\s+((?:\\.|[^\"])*)"\s*$/gim,
+    ),
+  ].map(([, tick, name]) => ({
+    time: timeAtTick(Number(tick)),
+    name: name.replace(/\\"/g, '"').trim(),
+  }));
   return {
     tracks,
     lyrics,
+    sections: sectionMarkers,
     beats: buildBeats(
       timeAtTick,
       resolution,
@@ -183,6 +192,7 @@ export function parseWebHeroMidi(input) {
 
   const tempos = [];
   const lyrics = [];
+  const sections = [];
   const tracks = [];
   let offset = 8 + headerLength;
   let maxTick = 0;
@@ -234,6 +244,9 @@ export function parseWebHeroMidi(input) {
         } else if (type === 0x05) {
           const text = cleanLyric(readMetaText(length));
           if (text) lyrics.push({ tick, text, order: eventOrder++ });
+        } else if (type === 0x06) {
+          const name = readMetaText(length).trim();
+          if (name) sections.push({ tick, name, order: eventOrder++ });
         }
         offset += length;
         continue;
@@ -368,6 +381,9 @@ export function parseWebHeroMidi(input) {
     throw new Error("Le MIDI ne contient aucune note jouable Guitar Hero.");
   return {
     tracks: playableTracks,
+    sections: sections
+      .sort((a, b) => a.tick - b.tick || a.order - b.order)
+      .map(({ tick, name }) => ({ time: timeAtTick(tick), name })),
     beats: buildBeats(timeAtTick, division, timeAtTick(maxTick)),
     lyrics: lyrics
       .sort((a, b) => a.tick - b.tick || a.order - b.order)

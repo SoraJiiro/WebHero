@@ -1,4 +1,5 @@
 export const HIT_ZONE_OFFSET = 90;
+export const HIT_ZONE_HEIGHT_RATIO = 0.175;
 export const TARGET_MAX_RADIUS = 30;
 export const NOTE_MAX_RADIUS = 26;
 
@@ -7,8 +8,14 @@ const SPRITE_COL = [1, 4, 2, 0, 3];
 const SPRITE_PITCH = { x: 290.4, y: 219 };
 const SPRITE_ART = { dx: 8, dy: 20, w: 278, h: 190 };
 
-// Hitter (1559 x 1009, fond noir opaque) : 5 colonnes de 291,5 px, 3 lignes de 289 px.
-const HITTER = { x: 47.25, y: 60.5, w: 291.5, h: 289 };
+const HITTER = {
+  columnX: [338.75, 1215, 628, 30, 921.75],
+  rowY: [12, 340, 650],
+  rowH: [289, 289, 320],
+  centerY: [168, 163, 165],
+  w: 291.5,
+  h: 289,
+};
 // Feu : 7 frames de 114,3 x 162 ; la rafale joue 0..6, le sustain boucle sur 4 frames.
 const FIRE = {
   frames: 7,
@@ -31,19 +38,26 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
   const notesImg = loadImage("notes.png");
   const hitterImg = loadImage("hitter_sprite.png");
   const fireImg = loadImage("fire_sprite.png");
-  const isReady = (img) => img.complete && img.naturalWidth > 0;
+  let highwayImage = null;
+  let highwayImageSource = "";
+  const isReady = (img) => img?.complete && img.naturalWidth > 0;
   function drawHitter(lane, row, cx, cy, width) {
-    const height = (width * HITTER.h) / HITTER.w;
+    const sourceHeight = HITTER.rowH[row];
+    const height = (width * sourceHeight) / HITTER.w;
+    const scale = width / HITTER.w;
+    const centerOffset = (HITTER.centerY[row] - sourceHeight / 2) * scale;
     ctx.save();
-    ctx.globalCompositeOperation = "lighter";
+    ctx.globalCompositeOperation = state.highwayBackground
+      ? "source-over"
+      : "lighter";
     ctx.drawImage(
       hitterImg,
-      HITTER.x + SPRITE_COL[lane] * HITTER.w,
-      HITTER.y + row * HITTER.h,
+      HITTER.columnX[lane],
+      HITTER.rowY[row],
       HITTER.w,
-      HITTER.h,
+      sourceHeight,
       cx - width / 2,
-      cy - height / 2,
+      cy - height / 2 - centerOffset,
       width,
       height,
     );
@@ -133,34 +147,105 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
     const { x: trackX, width: trackWidth, laneWidth } = getTrackBounds();
     const hitY = height - HIT_ZONE_OFFSET;
     const topY = Math.max(0, height * 0.05);
+    const topScale = 0.82;
+    const perspectiveAt = (y) =>
+      topScale + (1 - topScale) * Math.max(0, Math.min(1, y / hitY));
+    const laneCenterAt = (lane, y) =>
+      width / 2 +
+      (trackX + (lane + 0.5) * laneWidth - width / 2) * perspectiveAt(y);
+    const trackEdgeAt = (edge, y) =>
+      width / 2 + (edge - width / 2) * perspectiveAt(y);
     const notesReady = isReady(notesImg);
     const spriteWidth = Math.min(laneWidth * 0.7, 80);
 
+    if (state.highwayBackground !== highwayImageSource) {
+      highwayImageSource = state.highwayBackground;
+      highwayImage = null;
+      if (highwayImageSource) {
+        highwayImage = new Image();
+        highwayImage.onload = () => draw(performance.now());
+        highwayImage.src = highwayImageSource;
+      }
+    }
+
     ctx.fillStyle = "#000";
-    ctx.fillRect(trackX, topY, trackWidth, height - topY);
+    ctx.beginPath();
+    ctx.moveTo(trackEdgeAt(trackX, topY), topY);
+    ctx.lineTo(trackEdgeAt(trackX + trackWidth, topY), topY);
+    ctx.lineTo(trackX + trackWidth, height);
+    ctx.lineTo(trackX, height);
+    ctx.closePath();
+    ctx.fill();
+    if (isReady(highwayImage)) {
+      const scale = Math.max(
+        trackWidth / highwayImage.naturalWidth,
+        (height - topY) / highwayImage.naturalHeight,
+      );
+      const imageWidth = highwayImage.naturalWidth * scale;
+      const imageHeight = highwayImage.naturalHeight * scale;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(trackEdgeAt(trackX, topY), topY);
+      ctx.lineTo(trackEdgeAt(trackX + trackWidth, topY), topY);
+      ctx.lineTo(trackX + trackWidth, height);
+      ctx.lineTo(trackX, height);
+      ctx.closePath();
+      ctx.clip();
+      ctx.globalAlpha = 0.48;
+      ctx.drawImage(
+        highwayImage,
+        trackX + (trackWidth - imageWidth) / 2,
+        topY + (height - topY - imageHeight) / 2,
+        imageWidth,
+        imageHeight,
+      );
+      ctx.restore();
+    }
     const fadeHeight = (height - topY) * 0.3;
     const laneLine = ctx.createLinearGradient(0, topY, 0, topY + fadeHeight);
     laneLine.addColorStop(0, "rgba(255,255,255,0)");
     laneLine.addColorStop(1, "rgba(255,255,255,.18)");
     for (let lane = 0; lane < 5; lane++) {
-      const laneX = trackX + lane * laneWidth;
+      const leftTop = trackEdgeAt(trackX + lane * laneWidth, topY);
+      const rightTop = trackEdgeAt(trackX + (lane + 1) * laneWidth, topY);
+      const leftBottom = trackX + lane * laneWidth;
+      const rightBottom = trackX + (lane + 1) * laneWidth;
       ctx.fillStyle =
         lane % 2 ? "rgba(255,255,255,.035)" : "rgba(255,255,255,.07)";
-      ctx.fillRect(laneX, topY, laneWidth, height - topY);
+      ctx.beginPath();
+      ctx.moveTo(leftTop, topY);
+      ctx.lineTo(rightTop, topY);
+      ctx.lineTo(rightBottom, height);
+      ctx.lineTo(leftBottom, height);
+      ctx.closePath();
+      ctx.fill();
       ctx.strokeStyle = laneLine;
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(laneX, topY);
-      ctx.lineTo(laneX, height);
+      ctx.moveTo(leftTop, topY);
+      ctx.lineTo(leftBottom, height);
+      ctx.stroke();
+    }
+    const laneDividerStartY = height - (height - topY) * 0.35;
+    const laneDividerProgress =
+      (laneDividerStartY - topY) / Math.max(1, height - topY);
+    ctx.strokeStyle = "rgba(255,255,255,.2)";
+    ctx.lineWidth = 2;
+    for (let lane = 1; lane < 5; lane++) {
+      const x = trackX + lane * laneWidth;
+      const topX = trackEdgeAt(x, topY);
+      ctx.beginPath();
+      ctx.moveTo(topX + (x - topX) * laneDividerProgress, laneDividerStartY);
+      ctx.lineTo(x, height);
       ctx.stroke();
     }
     // Bordures latérales seulement, pas de bord supérieur.
     ctx.strokeStyle = "rgba(210,220,235,.48)";
     ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.moveTo(trackX, topY);
+    ctx.moveTo(trackEdgeAt(trackX, topY), topY);
     ctx.lineTo(trackX, height);
-    ctx.moveTo(trackX + trackWidth, topY);
+    ctx.moveTo(trackEdgeAt(trackX + trackWidth, topY), topY);
     ctx.lineTo(trackX + trackWidth, height);
     ctx.stroke();
 
@@ -174,8 +259,8 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
           : "rgba(255,255,255,.14)";
         ctx.lineWidth = beat.strong ? 3 : 1.5;
         ctx.beginPath();
-        ctx.moveTo(trackX, y);
-        ctx.lineTo(trackX + trackWidth, y);
+        ctx.moveTo(trackEdgeAt(trackX, y), y);
+        ctx.lineTo(trackEdgeAt(trackX + trackWidth, y), y);
         ctx.stroke();
       }
     }
@@ -185,7 +270,55 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
     topFade.addColorStop(0, "#080808");
     topFade.addColorStop(1, "rgba(8,8,8,0)");
     ctx.fillStyle = topFade;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(trackEdgeAt(trackX, topY), topY);
+    ctx.lineTo(trackEdgeAt(trackX + trackWidth, topY), topY);
+    ctx.lineTo(
+      trackEdgeAt(trackX + trackWidth, topY + fadeHeight),
+      topY + fadeHeight,
+    );
+    ctx.lineTo(trackEdgeAt(trackX, topY + fadeHeight), topY + fadeHeight);
+    ctx.closePath();
+    ctx.clip();
     ctx.fillRect(0, topY, width, fadeHeight);
+    ctx.restore();
+
+    if (state.hitZonePreview) {
+      const hitZoneHalfHeight = ((height - topY) * HIT_ZONE_HEIGHT_RATIO) / 2;
+      const calibrationMs = state.audioDelay + state.videoDelay;
+      const calibratedY = Math.max(
+        topY + hitZoneHalfHeight,
+        Math.min(
+          height - hitZoneHalfHeight,
+          hitY + (calibrationMs / Math.max(1, state.travelTime)) * hitY,
+        ),
+      );
+      const hitZoneTop = calibratedY - hitZoneHalfHeight;
+      const hitZoneBottom = calibratedY + hitZoneHalfHeight;
+      ctx.fillStyle = "rgba(255,255,255,.08)";
+      ctx.beginPath();
+      ctx.moveTo(trackEdgeAt(trackX, hitZoneTop), hitZoneTop);
+      ctx.lineTo(trackEdgeAt(trackX + trackWidth, hitZoneTop), hitZoneTop);
+      ctx.lineTo(
+        trackEdgeAt(trackX + trackWidth, hitZoneBottom),
+        hitZoneBottom,
+      );
+      ctx.lineTo(trackEdgeAt(trackX, hitZoneBottom), hitZoneBottom);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,.2)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(trackEdgeAt(trackX, hitZoneTop), hitZoneTop);
+      ctx.lineTo(trackEdgeAt(trackX + trackWidth, hitZoneTop), hitZoneTop);
+      ctx.moveTo(trackEdgeAt(trackX, hitZoneBottom), hitZoneBottom);
+      ctx.lineTo(
+        trackEdgeAt(trackX + trackWidth, hitZoneBottom),
+        hitZoneBottom,
+      );
+      ctx.stroke();
+    }
 
     const { width: hitLaneWidth } = getLaneBounds(0);
     const targetRadius = Math.max(
@@ -194,13 +327,33 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
     );
 
     for (let lane = 0; lane < 5; lane++) {
-      const cx = trackX + (lane + 0.5) * laneWidth;
+      const cx = laneCenterAt(lane, hitY);
       const lit = state.heldLanes.includes(lane);
       if (isReady(hitterImg)) {
         const flash =
           now - state.fireAt[lane] < HIT_FLASH_MS ||
           state.notes.some((n) => n.lane === lane && n.holding);
         const hitterWidth = Math.min(laneWidth * 0.75, 90);
+        if (flash) {
+          ctx.save();
+          ctx.globalAlpha = 0.42;
+          ctx.shadowColor = colors[lane];
+          ctx.shadowBlur = 14;
+          ctx.strokeStyle = colors[lane];
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.ellipse(
+            cx,
+            hitY,
+            hitterWidth * 0.43,
+            hitterWidth * 0.34,
+            0,
+            0,
+            Math.PI * 2,
+          );
+          ctx.stroke();
+          ctx.restore();
+        }
         drawHitter(lane, flash ? 2 : lit ? 1 : 0, cx, hitY, hitterWidth);
         ctx.save();
         ctx.fillStyle = "#fff";
@@ -238,8 +391,12 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
     state.notes.forEach((note) => {
       const progress = Math.max(0, (now - note.spawnAt) / note.travelTime);
       const y = note.hitRegistered ? hitY : progress * hitY;
-      const x = trackX + (note.lane + 0.5) * laneWidth;
-      const radius = Math.max(0, Math.min(NOTE_MAX_RADIUS, laneWidth / 2 - 6));
+      const projection = perspectiveAt(y);
+      const x = laneCenterAt(note.lane, y);
+      const radius = Math.max(
+        0,
+        Math.min(NOTE_MAX_RADIUS, laneWidth / 2 - 6) * projection,
+      );
       if (note.sustain > 0) {
         const sustainHeadY = Math.max(topY, y);
         const tailY = Math.max(
@@ -251,18 +408,22 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
               : y - (note.sustain / (note.travelTime / 1000)) * hitY,
           ),
         );
-        const tailHalfWidth = Math.max(
-          2,
-          notesReady ? spriteWidth * 0.07 : radius * 0.28,
-        );
-        const noteHalfWidth = tailHalfWidth;
+        const tailProjection = perspectiveAt(tailY);
+        const headProjection = perspectiveAt(sustainHeadY);
+        const tailBaseWidth = notesReady
+          ? spriteWidth * 0.07
+          : Math.min(NOTE_MAX_RADIUS, laneWidth / 2 - 6) * 0.28;
+        const tailHalfWidth = Math.max(2, tailBaseWidth * tailProjection);
+        const noteHalfWidth = Math.max(2, tailBaseWidth * headProjection);
+        const tailX = laneCenterAt(note.lane, tailY);
+        const sustainHeadX = laneCenterAt(note.lane, sustainHeadY);
         ctx.globalAlpha = note.releasedAt ? 0.22 : 0.55;
         ctx.fillStyle = colors[note.lane];
         ctx.beginPath();
-        ctx.moveTo(x - tailHalfWidth, tailY);
-        ctx.lineTo(x + tailHalfWidth, tailY);
-        ctx.lineTo(x + noteHalfWidth, sustainHeadY);
-        ctx.lineTo(x - noteHalfWidth, sustainHeadY);
+        ctx.moveTo(tailX - tailHalfWidth, tailY);
+        ctx.lineTo(tailX + tailHalfWidth, tailY);
+        ctx.lineTo(sustainHeadX + noteHalfWidth, sustainHeadY);
+        ctx.lineTo(sustainHeadX - noteHalfWidth, sustainHeadY);
         ctx.closePath();
         ctx.fill();
         ctx.globalAlpha = 1;
@@ -273,7 +434,7 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
       if (note.missed) ctx.globalAlpha = 0.3;
       if (notesReady) {
         const row = note.type === "tap" ? 2 : note.type === "hopo" ? 1 : 0;
-        drawSprite(note.lane, row, x, y, spriteWidth);
+        drawSprite(note.lane, row, x, y, spriteWidth * projection);
         ctx.globalAlpha = 1;
         return;
       }
@@ -297,7 +458,7 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
       ctx.globalAlpha = 1;
     });
     if (isReady(fireImg)) {
-      const fireWidth = Math.min(laneWidth * 0.85, 100);
+      const fireWidth = Math.min(laneWidth * 0.75, 88);
       for (let lane = 0; lane < 5; lane++) {
         const cx = trackX + (lane + 0.5) * laneWidth;
         const age = now - state.fireAt[lane];
@@ -326,7 +487,7 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
       const barHeight = Math.max(6, height * 0.016);
       ctx.fillStyle = "rgba(255,255,255,.22)";
       ctx.fillRect(hudX, barY, hudWidth, barHeight);
-      ctx.fillStyle = "#ffd400";
+      ctx.fillStyle = state.primaryColor;
       ctx.fillRect(hudX, barY, hudWidth * songProgress, barHeight);
       const presenceY = barY + barHeight + 5;
       const presenceHeight = Math.max(4, barHeight * 0.65);
@@ -339,7 +500,7 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
       } else {
         ctx.fillStyle = "rgba(255,255,255,.22)";
         ctx.fillRect(hudX, presenceY, hudWidth, presenceHeight);
-        ctx.fillStyle = "#ffd400";
+        ctx.fillStyle = state.primaryColor;
         ctx.fillRect(
           hudX,
           presenceY,
@@ -357,6 +518,22 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
         hudX + hudWidth,
         height * (compactLayout ? 0.13 : 0.19),
       );
+      let practiceStatsLabel = "";
+      if (state.practiceRange) {
+        const accuracy =
+          state.hits + state.misses
+            ? Math.round((state.hits / (state.hits + state.misses)) * 100)
+            : 100;
+        ctx.textAlign = "left";
+        ctx.fillStyle = "rgba(255,255,255,.82)";
+        ctx.font = `700 ${Math.max(10, Math.min(15, width * 0.016))}px sans-serif`;
+        ctx.fillText(
+          `${accuracy}%  ${state.hits} hits  ${state.misses} miss`,
+          hudX,
+          height * (compactLayout ? 0.17 : 0.24),
+        );
+        practiceStatsLabel = `Précision ${accuracy}%. ${state.hits} hits, ${state.misses} misses.`;
+      }
 
       const multiplierProgress = state.multiplier === 4 ? 10 : state.combo % 10;
       const multiplierColor = multiplierColors[state.multiplier - 1];
@@ -404,11 +581,25 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
       ctx.lineWidth = 2;
       ctx.strokeStyle = multiplierColor;
       ctx.stroke();
+      if (state.combo > 0 && !state.fullComboBroken) {
+        ctx.save();
+        ctx.globalAlpha = 0.72 + Math.sin(now / 140) * 0.18;
+        ctx.strokeStyle = "#ffd400";
+        ctx.lineWidth = 2;
+        ctx.shadowColor = "#ffd400";
+        ctx.shadowBlur = 8;
+        ctx.setLineDash([5, 4]);
+        ctx.lineDashOffset = -(now / 35) % 9;
+        ctx.beginPath();
+        ctx.arc(orbX, orbY, orbRadius + 6, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
       ctx.fillStyle = multiplierColor;
       ctx.textAlign = "center";
       ctx.font = `bold ${Math.max(10, orbRadius * 1.05)}px sans-serif`;
       ctx.fillText(`x${state.multiplier}`, orbX, orbY);
-      const canvasLabel = `Web Hero. Score ${state.score}. Série ${state.combo}. Multiplicateur x${state.multiplier}. Progression ${Math.floor(songProgress * 100)}%. Stage presence ${state.stagePresence}%.`;
+      const canvasLabel = `Web Hero. Score ${state.score}.${practiceStatsLabel ? ` ${practiceStatsLabel}` : ""} Série ${state.combo}. Multiplicateur x${state.multiplier}. Progression ${Math.floor(songProgress * 100)}%. Stage presence ${state.stagePresence}%.`;
       if (canvas.getAttribute("aria-label") !== canvasLabel)
         canvas.setAttribute("aria-label", canvasLabel);
     }
@@ -488,13 +679,17 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
       ctx.fillStyle = "#fff";
       ctx.font = `bold ${Math.max(12, Math.min(18, width * 0.022))}px sans-serif`;
       ctx.fillText("PROCHAINE NOTE", centerX, centerY - panelHeight * 0.22);
-      ctx.fillStyle = "#ffd400";
+      ctx.fillStyle = state.primaryColor;
       ctx.font = `800 ${Math.max(24, Math.min(48, width * 0.06))}px sans-serif`;
       ctx.fillText(
         `${secondsUntilNextNote}`,
         centerX,
         centerY + panelHeight * 0.2,
       );
+    }
+    if (state.fadeAlpha > 0) {
+      ctx.fillStyle = `rgba(0,0,0,${state.fadeAlpha})`;
+      ctx.fillRect(0, 0, width, height);
     }
   }
 

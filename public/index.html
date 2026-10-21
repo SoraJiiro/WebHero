@@ -32,34 +32,59 @@
 
         <div class="toolbar" role="group"
           aria-label="Configuration de la partie">
+          <div class="toolbar-action language-action">
+            <span><i class="fa-solid fa-language" aria-hidden="true"></i>
+              Langue</span>
+            <div class="language-toggle" role="group" aria-label="Langue">
+              <button type="button" aria-pressed="true">FR</button>
+              <button type="button" aria-pressed="false"
+                onclick="alert('Not implemented yet / Indisponible pour l\'instant');">EN</button>
+            </div>
+          </div>
+          <div class="toolbar-action">
+            <span><i class="fa-solid fa-display" aria-hidden="true"></i>
+              Affichage</span>
+            <button id="fullscreen-button" class="ghost-button" type="button"
+              aria-label="Passer en plein écran (recommandé)"
+              title="Activer ou quitter le plein écran (recommandé)"><i
+                class="fa-solid fa-expand" aria-hidden="true"></i> Plein
+              écran</button>
+          </div>
+          <div class="toolbar-action">
+            <span><i class="fa-solid fa-music" aria-hidden="true"></i>
+              Chart</span>
+            <button id="web-hero-chart-import" type="button"
+              aria-label="Importer un dossier de chart avec notes, fichier INI et pistes audio"
+              title="Importer le dossier d’une chart et ses pistes audio"><i
+                class="fa-solid fa-folder-open" aria-hidden="true"></i>
+              Importer un dossier</button>
+          </div>
           <label class="field difficulty-field">
             <span><i class="fa-solid fa-gauge-high" aria-hidden="true"></i>
               Difficulté</span>
-            <select id="web-hero-difficulty" aria-label="Difficulté de la chart"
-              title="Choisir la difficulté">
-              <option value="easy">Facile</option>
-              <option value="medium" selected>Moyen</option>
-              <option value="hard">Difficile</option>
-              <option value="expert">Expert</option>
-            </select>
+            <span class="select-wrap">
+              <select id="web-hero-difficulty"
+                aria-label="Difficulté de la chart"
+                title="Choisir la difficulté">
+                <option value="easy">Facile</option>
+                <option value="medium" selected>Moyen</option>
+                <option value="hard">Difficile</option>
+                <option value="expert">Expert</option>
+              </select>
+              <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+            </span>
           </label>
-          <button id="web-hero-chart-import" type="button"
-            aria-label="Importer un dossier de chart avec notes, fichier INI et pistes audio"
-            title="Importer le dossier d’une chart et ses pistes audio"><i
-              class="fa-solid fa-folder-open" aria-hidden="true"></i> Importer
-            un dossier</button>
-          <button id="fullscreen-button" class="ghost-button" type="button"
-            aria-label="Passer en plein écran (recommandé)"
-            title="Activer ou quitter le plein écran (recommandé)"><i
-              class="fa-solid fa-expand" aria-hidden="true"></i> Plein
-            écran</button>
           <button id="web-hero-start" class="primary-button" type="button"
             aria-label="Démarrer la partie" title="Jouer la chart importée"><i
               class="fa-solid fa-play" aria-hidden="true"></i> Jouer</button>
-          <button id="web-hero-stop" type="button"
-            aria-label="Arrêter la partie" title="Arrêter la partie en cours"
-            hidden><i class="fa-solid fa-stop" aria-hidden="true"></i>
-            Arrêter</button>
+          <div class="toolbar-action">
+            <span><i class="fa-solid fa-gamepad" aria-hidden="true"></i>
+              Session</span>
+            <button id="web-hero-stop" type="button"
+              aria-label="Arrêter la partie" title="Arrêter la partie en cours"
+              hidden><i class="fa-solid fa-stop" aria-hidden="true"></i>
+              Arrêter</button>
+          </div>
         </div>
       </header>
 
@@ -114,11 +139,15 @@
               <div class="result-heading">
                 <span id="web-hero-result-kicker">SESSION TERMINÉE</span>
                 <h2 id="web-hero-result-title">GAME OVER</h2>
+                <p id="web-hero-result-song" class="result-song"></p>
               </div>
               <div class="result-score">
                 <span><i class="fa-solid fa-trophy" aria-hidden="true"></i>
                   SCORE FINAL</span>
                 <strong id="web-hero-final-score">0</strong>
+                <span id="web-hero-final-fc" class="result-fc" hidden>
+                  <i class="fa-solid fa-crown" aria-hidden="true"></i> FC
+                </span>
               </div>
               <div class="result-stats">
                 <div class="result-stat result-accuracy">
@@ -210,6 +239,29 @@
                     aria-hidden="true"></i>
                   No-Fail Mode</span>
               </label>
+              <label class="speed-control nofail">
+                <input id="web-hero-practice" type="checkbox" />
+                <span><i class="fa-solid fa-repeat" aria-hidden="true"></i>
+                  Practice</span>
+              </label>
+              <label class="speed-control practice-section-control">
+                <span>Début</span>
+                <span class="select-wrap">
+                  <select id="web-hero-practice-start-section" disabled>
+                    <option value="-1">Début de la chart</option>
+                  </select>
+                  <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                </span>
+              </label>
+              <label class="speed-control practice-section-control">
+                <span>Fin</span>
+                <span class="select-wrap">
+                  <select id="web-hero-practice-end-section" disabled>
+                    <option value="-1">Fin de la chart</option>
+                  </select>
+                  <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                </span>
+              </label>
             </div>
           </section>
           <section class="settings-panel" aria-label="Calibration">
@@ -242,6 +294,11 @@
                   aria-describedby="web-hero-video-delay-value" />
                 <output id="web-hero-video-delay-value"
                   for="web-hero-video-delay">0 ms</output>
+              </label>
+              <label class="speed-control nofail">
+                <input id="web-hero-hit-zone-preview" type="checkbox" />
+                <span><i class="fa-solid fa-bullseye" aria-hidden="true"></i>
+                  Aperçu hitzone calibrée</span>
               </label>
             </div>
           </section>
@@ -339,10 +396,32 @@
                   title="Cliquer puis appuyer sur une touche"></button></label>
             </div>
           </section>
-          <section class="settings-panel key-row" role="group"
-            aria-label="Configuration des touches de jeu">
+          <section class="settings-panel" role="group"
+            aria-label="Personnalisation de l’interface">
             <div class="panel-head"><span class="footer-section-label"><i
                   class="fa-solid fa-user-pen"></i> Custom</span></div>
+            <div class="panel-body custom-settings">
+              <label class="custom-color-control">
+                <span><i class="fa-solid fa-palette" aria-hidden="true"></i>
+                  Couleur principale</span>
+                <input id="web-hero-primary-color" type="color"
+                  value="#ffd400"
+                  aria-label="Couleur principale de l’interface" />
+              </label>
+              <label class="custom-background-control">
+                <span><i class="fa-regular fa-image" aria-hidden="true"></i>
+                  Fond du highway</span>
+                <input id="web-hero-highway-background" type="file"
+                  accept="image/*"
+                  aria-label="Choisir une image de fond du highway" />
+                <output id="web-hero-background-name">Aucune image</output>
+              </label>
+              <button id="web-hero-background-clear" class="background-clear"
+                type="button" disabled>
+                <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                Retirer l’image
+              </button>
+            </div>
           </section>
         </div>
         <div class="touch-controls" role="group" aria-label="Touches tactiles">

@@ -59,7 +59,10 @@ export function diffPadLanes(padButtons, down, heldLanes) {
 export const GUITAR_WINDOW = 150;
 
 export function findGuitarGroup(notes, now, window = GUITAR_WINDOW) {
-  const open = notes.filter((n) => !n.hitRegistered && !n.missed);
+  const open = notes.filter(
+    (n) =>
+      !n.hitRegistered && !n.missed && now <= (n.hitUntil ?? n.hitAt + window),
+  );
   let target;
   for (const n of open) {
     const d = Math.abs(now - n.hitAt);
@@ -103,7 +106,7 @@ export function findHitNote(notes, lanes, now, earlyWindow = 280) {
       note.hitRegistered ||
       lanePriority < 0 ||
       now < note.hitAt - earlyWindow ||
-      now > note.missAt
+      now > (note.hitUntil ?? note.missAt)
     )
       continue;
     const distance = Math.abs(now - note.hitAt);
@@ -125,6 +128,6 @@ export function findAutoHitNote(notes, lane, now) {
       note.lane === lane &&
       !note.hitRegistered &&
       now >= note.hitAt &&
-      now <= note.missAt,
+      now <= (note.hitUntil ?? note.missAt),
   );
 }
