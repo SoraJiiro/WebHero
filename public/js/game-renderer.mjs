@@ -1,5 +1,5 @@
 export const HIT_ZONE_OFFSET = 90;
-export const HIT_ZONE_HEIGHT_RATIO = 0.175;
+export const HIT_ZONE_HEIGHT_RATIO = 0.18;
 export const TARGET_MAX_RADIUS = 30;
 export const NOTE_MAX_RADIUS = 26;
 

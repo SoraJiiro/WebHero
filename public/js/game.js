@@ -110,6 +110,7 @@ export function initWebHero(socket = null) {
     return;
 
   const statusEl = document.getElementById("web-hero-status-text");
+  const touchPauseButton = document.getElementById("web-hero-touch-pause");
   const importProgress = document.getElementById("web-hero-import-progress");
   const gameOverEl = document.getElementById("web-hero-game-over");
   const restartButton = document.getElementById("web-hero-restart");
@@ -1296,6 +1297,7 @@ export function initWebHero(socket = null) {
   canvas.addEventListener("lostpointercapture", finishCanvasTouch);
 
   startButton.addEventListener("click", start);
+  touchPauseButton?.addEventListener("click", startPressed);
   stopButton.addEventListener("click", () =>
     finish("Partie arrêtée — score non enregistré", { stopped: true }),
   );
