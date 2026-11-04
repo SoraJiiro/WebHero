@@ -7,5 +7,6 @@ await access(path.join(root, "public", "index.html"));
 await access(path.join(root, "public", "js", "game.js"));
 await access(path.join(root, "public", "js", "web_hero_chart.mjs"));
 await access(path.join(root, "public", "js", "game-renderer.mjs"));
+await access(path.join(root, "public", "js", "chart-storage.mjs"));
 await access(path.join(root, "public", "js", "utils.js"));
 console.log("WebHero static client is ready.");

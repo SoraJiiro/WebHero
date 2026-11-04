@@ -1,3 +1,5 @@
+import { getFullComboStatus } from "./utils.js";
+
 export const HIT_ZONE_OFFSET = 90;
 export const HIT_ZONE_HEIGHT_RATIO = 0.18;
 export const TARGET_MAX_RADIUS = 30;
@@ -26,6 +28,7 @@ const FIRE = {
   loopMs: 70,
 };
 const HIT_FLASH_MS = 110;
+const HIGHWAY_IMAGE_SLICES = 32;
 
 export function createGameRenderer({ canvas, state, keys, colors }) {
   const ctx = canvas.getContext("2d");
@@ -192,13 +195,52 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
       ctx.closePath();
       ctx.clip();
       ctx.globalAlpha = 0.48;
-      ctx.drawImage(
-        highwayImage,
-        trackX + (trackWidth - imageWidth) / 2,
-        topY + (height - topY - imageHeight) / 2,
-        imageWidth,
-        imageHeight,
-      );
+      const scrollStartAt = state.startedAt - state.travelTime;
+      const scrollDistance = state.running
+        ? ((Math.max(0, now - scrollStartAt) / state.travelTime) * hitY) %
+          (imageHeight * 2)
+        : 0;
+      const tileShift = Math.floor(scrollDistance / imageHeight);
+      const tileOffset = scrollDistance % imageHeight;
+      const imageX = trackX + (trackWidth - imageWidth) / 2;
+      const imageTop = topY + (height - topY - imageHeight) / 2;
+      for (
+        let tile = -1, imageY = imageTop + tileOffset - imageHeight;
+        imageY < height;
+        tile++, imageY += imageHeight
+      ) {
+        const mirrored = Math.abs((tile - tileShift) % 2) === 1;
+        const sourceSliceHeight =
+          highwayImage.naturalHeight / HIGHWAY_IMAGE_SLICES;
+        const sliceHeight = imageHeight / HIGHWAY_IMAGE_SLICES;
+        for (let slice = 0; slice < HIGHWAY_IMAGE_SLICES; slice++) {
+          const sourceSlice = mirrored
+            ? HIGHWAY_IMAGE_SLICES - slice - 1
+            : slice;
+          const sliceY = imageY + slice * sliceHeight;
+          const slicePerspective = perspectiveAt(sliceY + sliceHeight / 2);
+          ctx.save();
+          ctx.translate(width / 2, 0);
+          ctx.scale(slicePerspective, 1);
+          ctx.translate(-width / 2, 0);
+          if (mirrored) {
+            ctx.translate(0, sliceY + sliceHeight);
+            ctx.scale(1, -1);
+          }
+          ctx.drawImage(
+            highwayImage,
+            0,
+            sourceSlice * sourceSliceHeight,
+            highwayImage.naturalWidth,
+            sourceSliceHeight,
+            imageX,
+            sliceY,
+            imageWidth,
+            sliceHeight,
+          );
+          ctx.restore();
+        }
+      }
       ctx.restore();
     }
     const fadeHeight = (height - topY) * 0.3;
@@ -328,7 +370,15 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
 
     for (let lane = 0; lane < 5; lane++) {
       const cx = laneCenterAt(lane, hitY);
+      const laneBaseX = trackX + (lane + 0.5) * laneWidth;
+      const laneAngle = Math.atan2(
+        (laneBaseX - width / 2) * (1 - topScale),
+        hitY,
+      );
       const lit = state.heldLanes.includes(lane);
+      ctx.save();
+      ctx.translate(cx, hitY);
+      ctx.rotate(-laneAngle);
       if (isReady(hitterImg)) {
         const flash =
           now - state.fireAt[lane] < HIT_FLASH_MS ||
@@ -343,8 +393,8 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
           ctx.lineWidth = 2;
           ctx.beginPath();
           ctx.ellipse(
-            cx,
-            hitY,
+            0,
+            0,
             hitterWidth * 0.43,
             hitterWidth * 0.34,
             0,
@@ -354,15 +404,14 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
           ctx.stroke();
           ctx.restore();
         }
-        drawHitter(lane, flash ? 2 : lit ? 1 : 0, cx, hitY, hitterWidth);
-        ctx.save();
+        drawHitter(lane, flash ? 2 : lit ? 1 : 0, 0, 0, hitterWidth);
         ctx.fillStyle = "#fff";
         ctx.shadowColor = "#000";
         ctx.shadowBlur = 4;
         ctx.font = `bold ${Math.max(12, hitterWidth * 0.15)}px sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(keys[lane].toUpperCase(), cx, hitY);
+        ctx.fillText(keys[lane].toUpperCase(), 0, 0);
         ctx.restore();
         continue;
       }
@@ -372,20 +421,21 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
         ctx.shadowBlur = 22;
         ctx.fillStyle = colors[lane];
         ctx.beginPath();
-        ctx.arc(cx, hitY, targetRadius, 0, Math.PI * 2);
+        ctx.arc(0, 0, targetRadius, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       }
       ctx.strokeStyle = colors[lane];
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(cx, hitY, targetRadius, 0, Math.PI * 2);
+      ctx.arc(0, 0, targetRadius, 0, Math.PI * 2);
       ctx.stroke();
       ctx.fillStyle = lit ? "#080808" : colors[lane];
       ctx.font = `bold ${Math.max(12, Math.min(18, targetRadius * 1.05))}px sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(keys[lane].toUpperCase(), cx, hitY);
+      ctx.fillText(keys[lane].toUpperCase(), 0, 0);
+      ctx.restore();
     }
 
     state.notes.forEach((note) => {
@@ -581,7 +631,7 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
       ctx.lineWidth = 2;
       ctx.strokeStyle = multiplierColor;
       ctx.stroke();
-      if (state.combo > 0 && !state.fullComboBroken) {
+      if (state.combo > 0 && getFullComboStatus(state) !== "broken") {
         ctx.save();
         ctx.globalAlpha = 0.72 + Math.sin(now / 140) * 0.18;
         ctx.strokeStyle = "#ffd400";

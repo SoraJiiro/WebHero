@@ -13,6 +13,11 @@ import {
 } from "./web_hero_chart.mjs";
 import { parseSongIni, selectChartFolderFiles } from "./chart-import.mjs";
 import {
+  markLastChartPlayed,
+  restoreLastChart,
+  saveLastChart,
+} from "./chart-storage.mjs";
+import {
   createGameRenderer,
   HIT_ZONE_OFFSET,
   HIT_ZONE_HEIGHT_RATIO,
@@ -26,6 +31,7 @@ import {
   findGuitarGroup,
   findHitNote,
   fretsMatch,
+  getFullComboStatus,
   getHoldTapLanes,
   getPressedPadButtons,
   pickPad,
@@ -51,7 +57,7 @@ const DIFFICULTIES = {
 const DIFFICULTY_ORDER = Object.keys(DIFFICULTIES);
 
 export function initWebHero(socket = null) {
-  const stage = document.getElementById("stage22");
+  const stage = document.getElementById("jeu");
   const canvas = document.getElementById("web-hero-canvas");
   const startButton = document.getElementById("web-hero-start");
   const stopButton = document.getElementById("web-hero-stop");
@@ -201,6 +207,9 @@ export function initWebHero(socket = null) {
   let audioContext = null;
   let audioBuffers = [];
   let audioSources = [];
+  let savedChartRecord = null;
+  let lastChartId = null;
+  let storageWarning = "";
 
   try {
     const parsedSettings = JSON.parse(
@@ -638,12 +647,7 @@ export function initWebHero(socket = null) {
     gameOverEl.classList.toggle("is-completed", completed);
     gameOverEl.classList.toggle("is-stopped", stopped);
     finalScoreEl.textContent = state.score.toLocaleString("fr-FR");
-    finalFcEl.hidden = !(
-      completed &&
-      state.hits === state.totalNotes &&
-      state.misses === 0 &&
-      state.overHits === 0
-    );
+    finalFcEl.hidden = !completed || getFullComboStatus(state) !== "complete";
     finalTimeEl.textContent = `${finalDuration}s`;
     finalAccuracyEl.textContent = `${accuracy}%`;
     finalNotesEl.textContent = state.totalNotes.toLocaleString("fr-FR");
@@ -925,7 +929,7 @@ export function initWebHero(socket = null) {
     stopButton.disabled = true;
     setChartControlsDisabled(true);
     try {
-      if (audioBuffers.length) {
+      if (audioBuffers.length || savedChartRecord?.audioFiles.length) {
         audioContext ||= new AudioContext();
         await audioContext.resume();
       }
@@ -935,6 +939,19 @@ export function initWebHero(socket = null) {
       statusEl.textContent = `Préparation audio impossible : ${error.message}`;
       console.error("Impossible de préparer la bande-son importée.", error);
       return;
+    }
+    if (savedChartRecord?.audioFiles.length && !audioBuffers.length) {
+      try {
+        const restored = await restoreLastChart(localStorage, { audioContext });
+        if (
+          restored?.record.id === savedChartRecord.id &&
+          restored.audioRestored
+        )
+          audioBuffers = restored.audioBuffers;
+        else storageWarning = " — audio mémorisé indisponible";
+      } catch {
+        storageWarning = " — audio mémorisé indisponible";
+      }
     }
     state.difficulty = difficultySelect.value;
     const { difficulty: chartDifficulty, track: chartTrack } = selectChartTrack(
@@ -960,6 +977,7 @@ export function initWebHero(socket = null) {
       : null;
     const schedule = scheduleTimeline(state.practiceTrack, startAt);
     state.running = true;
+    if (lastChartId) markLastChartPlayed(localStorage, lastChartId);
     stage.classList.add("is-playing");
     gameOverEl.hidden = true;
     canvas.focus({ preventScroll: true });
@@ -992,7 +1010,7 @@ export function initWebHero(socket = null) {
     stopButton.hidden = false;
     stopButton.disabled = false;
     setChartControlsDisabled(true);
-    statusEl.textContent = `En jeu — ${DIFFICULTIES[chartDifficulty].label} (${chartTrack.name})`;
+    statusEl.textContent = `En jeu — ${DIFFICULTIES[chartDifficulty].label} (${chartTrack.name})${storageWarning}`;
     state.animation = requestAnimationFrame(frame);
     if (audioBuffers.length) {
       playAudio(
@@ -1191,7 +1209,9 @@ export function initWebHero(socket = null) {
   const heldKeyboardLanes = new Map();
   const heldTouchPointers = new Map();
   const heldTouchLanes = new Map();
-  const heldCanvasPointers = new Map();
+  const heldCanvasPointers = new Set();
+  const touchLaneButtons = [...document.querySelectorAll(".touch-lane")];
+  const touchControls = document.querySelector(".touch-controls");
   const autoHitLanes = new Set();
   function getHeldLanes() {
     return [...heldKeyboardLanes.values(), ...heldTouchLanes.keys()];
@@ -1210,7 +1230,7 @@ export function initWebHero(socket = null) {
     heldTouchPointers.clear();
     heldTouchLanes.clear();
     heldCanvasPointers.clear();
-    document.querySelectorAll(".touch-lane.is-pressed").forEach((button) => {
+    touchLaneButtons.forEach((button) => {
       button.classList.remove("is-pressed");
     });
     for (const lane of autoHitLanes) {
@@ -1218,55 +1238,78 @@ export function initWebHero(socket = null) {
     }
   }
 
-  document.querySelectorAll(".touch-lane").forEach((button, lane) => {
-    const finishTouch = (event) => {
-      if (heldTouchPointers.get(event.pointerId) !== lane) return;
-      heldTouchPointers.delete(event.pointerId);
-      const pointers = heldTouchLanes.get(lane);
-      pointers.delete(event.pointerId);
+  function setTouchPointerLane(pointerId, lane) {
+    if (!heldTouchPointers.has(pointerId)) return;
+    const previousLane = heldTouchPointers.get(pointerId);
+    if (previousLane === lane) return;
+    if (previousLane !== null) {
+      const pointers = heldTouchLanes.get(previousLane);
+      pointers.delete(pointerId);
       if (pointers.size === 0) {
-        heldTouchLanes.delete(lane);
-        button.classList.remove("is-pressed");
-        release(keys[lane]);
-        if (!getHeldLanes().includes(lane)) autoHitLanes.delete(lane);
+        heldTouchLanes.delete(previousLane);
+        touchLaneButtons[previousLane].classList.remove("is-pressed");
+        release(keys[previousLane]);
+        if (!getHeldLanes().includes(previousLane))
+          autoHitLanes.delete(previousLane);
       }
-    };
+    }
+    heldTouchPointers.set(pointerId, lane);
+    if (lane === null) return;
+    const pointers = heldTouchLanes.get(lane) || new Set();
+    if (pointers.size === 0) pressLane(lane);
+    pointers.add(pointerId);
+    heldTouchLanes.set(lane, pointers);
+    touchLaneButtons[lane].classList.add("is-pressed");
+  }
+
+  function finishTouchPointer(pointerId) {
+    if (!heldTouchPointers.has(pointerId)) return;
+    setTouchPointerLane(pointerId, null);
+    heldTouchPointers.delete(pointerId);
+    heldCanvasPointers.delete(pointerId);
+  }
+
+  touchControls?.addEventListener("pointermove", (event) => {
+    if (
+      !heldTouchPointers.has(event.pointerId) ||
+      heldCanvasPointers.has(event.pointerId)
+    )
+      return;
+    const target = document
+      .elementFromPoint(event.clientX, event.clientY)
+      ?.closest(".touch-lane");
+    const lane = touchLaneButtons.indexOf(target);
+    event.preventDefault();
+    setTouchPointerLane(event.pointerId, lane < 0 ? null : lane);
+  });
+
+  touchLaneButtons.forEach((button, lane) => {
     button.addEventListener("pointerdown", (event) => {
       event.preventDefault();
       if (event.button !== 0) return;
       if (heldTouchPointers.has(event.pointerId)) return;
-      const pointers = heldTouchLanes.get(lane) || new Set();
-      if (pointers.size === 0) pressLane(lane);
-      pointers.add(event.pointerId);
-      heldTouchLanes.set(lane, pointers);
-      heldTouchPointers.set(event.pointerId, lane);
-      button.classList.add("is-pressed");
+      heldTouchPointers.set(event.pointerId, null);
+      setTouchPointerLane(event.pointerId, lane);
       button.setPointerCapture(event.pointerId);
     });
-    button.addEventListener("pointerup", finishTouch);
-    button.addEventListener("pointercancel", finishTouch);
-    button.addEventListener("lostpointercapture", finishTouch);
+    button.addEventListener("pointerup", (event) =>
+      finishTouchPointer(event.pointerId),
+    );
+    button.addEventListener("pointercancel", (event) =>
+      finishTouchPointer(event.pointerId),
+    );
+    button.addEventListener("lostpointercapture", (event) =>
+      finishTouchPointer(event.pointerId),
+    );
     button.addEventListener("click", (event) => {
       if (event.detail !== 0) return;
       pressLane(lane);
       release(keys[lane]);
     });
   });
-  const finishCanvasTouch = (event) => {
-    const lane = heldCanvasPointers.get(event.pointerId);
-    if (lane === undefined) return;
-    heldCanvasPointers.delete(event.pointerId);
-    const pointers = heldTouchLanes.get(lane);
-    pointers.delete(event.pointerId);
-    if (pointers.size === 0) {
-      heldTouchLanes.delete(lane);
-      release(keys[lane]);
-      if (!getHeldLanes().includes(lane)) autoHitLanes.delete(lane);
-    }
-  };
-  canvas.addEventListener("pointerdown", (event) => {
-    if (event.pointerType !== "touch" || !state.running) return;
+  function getCanvasTouchLane(event) {
     const rect = canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
     const x = ((event.clientX - rect.left) * state.viewWidth) / rect.width;
     const y = ((event.clientY - rect.top) * state.viewHeight) / rect.height;
     const track = getTrackBounds();
@@ -1276,25 +1319,39 @@ export function initWebHero(socket = null) {
       track.laneWidth / 2,
       Math.max(24, targetRadius + 8),
     );
-    if (
-      x < track.x ||
-      x >= track.x + track.width ||
-      lane < 0 ||
-      lane >= 5 ||
-      Math.abs(y - (state.viewHeight - HIT_ZONE_OFFSET)) > touchRadius
-    )
-      return;
+    return x >= track.x &&
+      x < track.x + track.width &&
+      lane >= 0 &&
+      lane < touchLaneButtons.length &&
+      Math.abs(y - (state.viewHeight - HIT_ZONE_OFFSET)) <= touchRadius
+      ? lane
+      : null;
+  }
+
+  canvas.addEventListener("pointerdown", (event) => {
+    if (event.pointerType !== "touch" || !state.running) return;
+    const lane = getCanvasTouchLane(event);
+    if (lane === null || heldTouchPointers.has(event.pointerId)) return;
     event.preventDefault();
-    const pointers = heldTouchLanes.get(lane) || new Set();
-    if (pointers.size === 0) pressLane(lane);
-    pointers.add(event.pointerId);
-    heldTouchLanes.set(lane, pointers);
-    heldCanvasPointers.set(event.pointerId, lane);
+    heldTouchPointers.set(event.pointerId, null);
+    heldCanvasPointers.add(event.pointerId);
+    setTouchPointerLane(event.pointerId, lane);
     canvas.setPointerCapture(event.pointerId);
   });
-  canvas.addEventListener("pointerup", finishCanvasTouch);
-  canvas.addEventListener("pointercancel", finishCanvasTouch);
-  canvas.addEventListener("lostpointercapture", finishCanvasTouch);
+  canvas.addEventListener("pointermove", (event) => {
+    if (!heldCanvasPointers.has(event.pointerId)) return;
+    event.preventDefault();
+    setTouchPointerLane(event.pointerId, getCanvasTouchLane(event));
+  });
+  canvas.addEventListener("pointerup", (event) =>
+    finishTouchPointer(event.pointerId),
+  );
+  canvas.addEventListener("pointercancel", (event) =>
+    finishTouchPointer(event.pointerId),
+  );
+  canvas.addEventListener("lostpointercapture", (event) =>
+    finishTouchPointer(event.pointerId),
+  );
 
   startButton.addEventListener("click", start);
   touchPauseButton?.addEventListener("click", startPressed);
@@ -1441,6 +1498,49 @@ export function initWebHero(socket = null) {
     backgroundClearButton.disabled = true;
     draw(performance.now());
   });
+  function configureLoadedChart(chart) {
+    practiceStartSectionSelect.replaceChildren(
+      new Option("Début de la chart", "-1"),
+      ...(chart.sections || []).map(
+        (section, index) => new Option(section.name, String(index)),
+      ),
+    );
+    practiceStartSectionSelect.value = "-1";
+    updatePracticeEndSections();
+    practiceStartSectionSelect.disabled = !practiceInput.checked;
+    practiceEndSectionSelect.disabled = !practiceInput.checked;
+  }
+
+  async function restorePreviousChart() {
+    chartImportButton.disabled = true;
+    startButton.disabled = true;
+    try {
+      const restored = await restoreLastChart(localStorage);
+      if (!restored) return;
+      savedChartRecord = restored.record;
+      lastChartId = restored.record.id;
+      state.chart = restored.record.chart;
+      state.chartTitle = restored.record.title;
+      configureLoadedChart(state.chart);
+      const selectedTrack = selectChartTrack(
+        state.chart,
+        difficultySelect.value,
+        DIFFICULTY_ORDER,
+      );
+      const audioStatus = restored.record.audioFiles.length
+        ? restored.record.audioCacheName
+          ? "pistes audio mémorisées"
+          : "audio non mémorisé"
+        : "sans bande-son associée";
+      statusEl.textContent = `${state.chartTitle} restaurée — ${selectedTrack.track.notes.length} notes (${selectedTrack.track.name}), ${audioStatus}.`;
+    } catch (error) {
+      console.error("Impossible de restaurer la dernière chart.", error);
+    } finally {
+      chartImportButton.disabled = false;
+      startButton.disabled = false;
+    }
+  }
+
   chartFileInput.addEventListener("change", async () => {
     const files = [...chartFileInput.files];
     if (!files.length) return;
@@ -1491,16 +1591,28 @@ export function initWebHero(socket = null) {
       state.chart = chart;
       state.chartTitle = songName;
       audioBuffers = decodedAudio;
-      practiceStartSectionSelect.replaceChildren(
-        new Option("Début de la chart", "-1"),
-        ...(chart.sections || []).map(
-          (section, index) => new Option(section.name, String(index)),
-        ),
-      );
-      practiceStartSectionSelect.value = "-1";
-      updatePracticeEndSections();
-      practiceStartSectionSelect.disabled = !practiceInput.checked;
-      practiceEndSectionSelect.disabled = !practiceInput.checked;
+      savedChartRecord = null;
+      lastChartId = null;
+      storageWarning = "";
+      configureLoadedChart(chart);
+      statusEl.textContent = "Sauvegarde locale de la chart et de l’audio…";
+      try {
+        const saved = await saveLastChart(localStorage, {
+          chart,
+          title: songName,
+          chartName: file.name,
+          audioFiles,
+        });
+        savedChartRecord = saved.record;
+        lastChartId = saved.record.id;
+        storageWarning =
+          saved.record.audioFiles.length && !saved.audioSaved
+            ? " — audio non mémorisé"
+            : "";
+      } catch (error) {
+        storageWarning = " — sauvegarde locale impossible";
+        console.error("Impossible de sauvegarder la chart importée.", error);
+      }
       const selectedTrack = selectChartTrack(
         state.chart,
         difficultySelect.value,
@@ -1510,7 +1622,7 @@ export function initWebHero(socket = null) {
       const audioStatus = audioFiles.length
         ? `${audioFiles.length} piste${audioFiles.length === 1 ? "" : "s"} audio synchronisée${audioFiles.length === 1 ? "" : "s"}`
         : "sans bande-son associée";
-      statusEl.textContent = `${songName} chargé — ${selectedTrack.track.notes.length} notes (${selectedTrack.track.name}), ${audioStatus}.`;
+      statusEl.textContent = `${songName} chargé — ${selectedTrack.track.notes.length} notes (${selectedTrack.track.name}), ${audioStatus}${storageWarning}.`;
     } catch (error) {
       statusEl.textContent = `Import impossible : ${error.message}`;
     } finally {
@@ -1535,7 +1647,8 @@ export function initWebHero(socket = null) {
   window.addEventListener("keydown", (event) => {
     if (learnKey(event)) return;
     if (event.code === pauseKey && state.running) {
-      state.paused ? resume() : pause();
+      event.preventDefault();
+      if (!event.repeat) state.paused ? resume() : pause();
       return;
     }
     if (event.repeat || event.target.matches("input, textarea, select")) return;
@@ -1654,9 +1767,9 @@ export function initWebHero(socket = null) {
   new ResizeObserver(resize).observe(canvas.parentElement);
   resize();
   draw(0);
-  if (!state.chart)
-    statusEl.textContent =
-      "Importez une chart .chart/.mid, avec ses fichiers audio pour jouer en musique.";
+  statusEl.textContent =
+    "Importez une chart .chart/.mid, avec ses fichiers audio pour jouer en musique.";
+  void restorePreviousChart();
   if (canvas) canvas.focus();
   /*alert(
     "Sur PC, utilisez l'option de plein écran pour une meilleure expérience.",

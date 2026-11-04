@@ -56,6 +56,12 @@ export function diffPadLanes(padButtons, down, heldLanes) {
   return { press, releaseLanes };
 }
 
+export function getFullComboStatus(state) {
+  if (state.fullComboBroken || state.misses > 0 || state.overHits > 0)
+    return "broken";
+  return state.hits === state.totalNotes ? "complete" : "possible";
+}
+
 export const GUITAR_WINDOW = 150;
 
 export function findGuitarGroup(notes, now, window = GUITAR_WINDOW) {
