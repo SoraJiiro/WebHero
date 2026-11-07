@@ -1,4 +1,5 @@
 import { getFullComboStatus } from "./utils.js";
+import { formatNumber, t } from "./i18n.mjs";
 
 export const HIT_ZONE_OFFSET = 90;
 export const HIT_ZONE_HEIGHT_RATIO = 0.18;
@@ -546,7 +547,7 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
         ctx.font = `800 ${Math.max(10, barHeight * 1.2)}px sans-serif`;
         ctx.textAlign = "left";
         ctx.textBaseline = "top";
-        ctx.fillText("NO-FAIL", hudX, presenceY);
+        ctx.fillText(t("game.noFail"), hudX, presenceY);
       } else {
         ctx.fillStyle = "rgba(255,255,255,.22)";
         ctx.fillRect(hudX, presenceY, hudWidth, presenceHeight);
@@ -558,13 +559,46 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
           presenceHeight,
         );
       }
+      const starPowerActive = state.starPowerActiveUntil > now;
+      const starPowerY = presenceY + presenceHeight + 5;
+      const starPowerLabelWidth = Math.max(15, barHeight * 2.4);
+      const starPowerBarWidth = Math.max(1, hudWidth - starPowerLabelWidth);
+      ctx.fillStyle = "rgba(255,255,255,.82)";
+      ctx.font = `800 ${Math.max(9, barHeight)}px sans-serif`;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText("SP", hudX, starPowerY + barHeight / 2);
+      ctx.fillStyle = "rgba(255,255,255,.22)";
+      ctx.fillRect(
+        hudX + starPowerLabelWidth,
+        starPowerY,
+        starPowerBarWidth,
+        barHeight,
+      );
+      ctx.fillStyle = starPowerActive ? "#fff27a" : "#69e5ff";
+      ctx.fillRect(
+        hudX + starPowerLabelWidth,
+        starPowerY,
+        (starPowerBarWidth * state.starPowerCharge) / 100,
+        barHeight,
+      );
+      if (starPowerActive) {
+        ctx.strokeStyle = "#fff27a";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(
+          hudX + starPowerLabelWidth,
+          starPowerY,
+          starPowerBarWidth,
+          barHeight,
+        );
+      }
 
       ctx.textAlign = "right";
       ctx.textBaseline = "middle";
       ctx.fillStyle = "#fff";
       ctx.font = `800 ${Math.max(14, Math.min(34, width * 0.035))}px sans-serif`;
       ctx.fillText(
-        state.score.toLocaleString(),
+        formatNumber(state.score),
         hudX + hudWidth,
         height * (compactLayout ? 0.13 : 0.19),
       );
@@ -578,11 +612,15 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
         ctx.fillStyle = "rgba(255,255,255,.82)";
         ctx.font = `700 ${Math.max(10, Math.min(15, width * 0.016))}px sans-serif`;
         ctx.fillText(
-          `${accuracy}%  ${state.hits} hits  ${state.misses} miss`,
+          `${accuracy}%  ${state.hits} ${t("game.hits")}  ${state.misses} ${t("game.miss")}`,
           hudX,
           height * (compactLayout ? 0.17 : 0.24),
         );
-        practiceStatsLabel = `Précision ${accuracy}%. ${state.hits} hits, ${state.misses} misses.`;
+        practiceStatsLabel = t("game.accuracy", {
+          accuracy,
+          hits: state.hits,
+          misses: state.misses,
+        });
       }
 
       const multiplierProgress = state.multiplier === 4 ? 10 : state.combo % 10;
@@ -648,8 +686,22 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
       ctx.fillStyle = multiplierColor;
       ctx.textAlign = "center";
       ctx.font = `bold ${Math.max(10, orbRadius * 1.05)}px sans-serif`;
-      ctx.fillText(`x${state.multiplier}`, orbX, orbY);
-      const canvasLabel = `Web Hero. Score ${state.score}.${practiceStatsLabel ? ` ${practiceStatsLabel}` : ""} Série ${state.combo}. Multiplicateur x${state.multiplier}. Progression ${Math.floor(songProgress * 100)}%. Stage presence ${state.stagePresence}%.`;
+      const shownMultiplier = state.multiplier * (starPowerActive ? 2 : 1);
+      ctx.fillText(`x${shownMultiplier}`, orbX, orbY);
+      const canvasLabel = t("game.canvasLabel", {
+        score: formatNumber(state.score),
+        practiceStatsLabel: practiceStatsLabel ? ` ${practiceStatsLabel}` : "",
+        combo: state.combo,
+        multiplier: shownMultiplier,
+        starPower: t("game.starPower", {
+          charge: Math.floor(state.starPowerCharge),
+          active: starPowerActive ? t("game.starPowerActive") : "",
+        }),
+        progress: Math.floor(songProgress * 100),
+        stagePresence: t("game.stagePresence", {
+          presence: state.stagePresence,
+        }),
+      });
       if (canvas.getAttribute("aria-label") !== canvasLabel)
         canvas.setAttribute("aria-label", canvasLabel);
     }
@@ -728,7 +780,7 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
       ctx.textBaseline = "middle";
       ctx.fillStyle = "#fff";
       ctx.font = `bold ${Math.max(12, Math.min(18, width * 0.022))}px sans-serif`;
-      ctx.fillText("PROCHAINE NOTE", centerX, centerY - panelHeight * 0.22);
+      ctx.fillText(t("game.nextNote"), centerX, centerY - panelHeight * 0.22);
       ctx.fillStyle = state.primaryColor;
       ctx.font = `800 ${Math.max(24, Math.min(48, width * 0.06))}px sans-serif`;
       ctx.fillText(

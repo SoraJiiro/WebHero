@@ -6,20 +6,25 @@
       content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#080808" />
     <meta name="description"
-      content="Joue à WebHero, un jeu de rythme gratuit inspiré de Guitar Hero. Lance une chart, règle la difficulté et joue au clavier ou sur écran tactile." />
+      content="Joue à WebHero, un jeu de rythme gratuit inspiré de Guitar Hero. Lance une chart, règle la difficulté et joue au clavier ou sur écran tactile."
+      data-i18n-attrs="content:meta.description" />
     <meta property="og:type" content="website" />
-    <meta property="og:locale" content="fr_FR" />
-    <meta property="og:title" content="WebHero — jeu de rythme" />
+    <meta property="og:locale" content="fr_FR"
+      data-i18n-attrs="content:meta.locale" />
+    <meta property="og:title" content="WebHero — jeu de rythme"
+      data-i18n-attrs="content:meta.title" />
     <meta property="og:description"
-      content="Un jeu de rythme gratuit inspiré de Guitar Hero, jouable au clavier ou sur écran tactile." />
+      content="Un jeu de rythme gratuit inspiré de Guitar Hero, jouable au clavier ou sur écran tactile."
+      data-i18n-attrs="content:meta.socialDescription" />
     <meta property="og:image" content="./assets/imgs/WH-LOGO.webp" />
     <meta name="twitter:card" content="summary" />
     <link rel="icon" type="image/svg+xml" href="./assets/imgs/WH-LOGO.svg" />
-    <title>WebHero — jeu de rythme gratuit</title>
+    <title data-i18n="meta.title">WebHero — jeu de rythme gratuit</title>
     <link rel="stylesheet" href="./css/styles.css" />
   </head>
   <body>
-    <a class="skip-link" href="#game-area">Passer au jeu</a>
+    <a class="skip-link" href="#game-area" data-i18n="nav.skip">Passer au
+      jeu</a>
     <div id="jeu" class="app-shell">
       <header class="topbar">
         <div class="brand-block">
@@ -32,105 +37,129 @@
         </div>
 
         <div class="toolbar" role="group"
-          aria-label="Configuration de la partie">
+          aria-label="Configuration de la partie"
+          data-i18n-attrs="aria-label:nav.gameConfig">
           <div class="toolbar-action language-action">
             <span><i class="fa-solid fa-language" aria-hidden="true"></i>
-              Langue</span>
-            <div class="language-toggle" role="group" aria-label="Langue">
-              <button type="button" aria-pressed="true">FR</button>
-              <button type="button" aria-pressed="false"
-                onclick="alert('Not implemented yet / Indisponible pour l\'instant');">EN</button>
+              <span data-i18n="nav.language">Langue</span></span>
+            <div class="language-toggle" role="group" aria-label="Langue"
+              data-i18n-attrs="aria-label:nav.language">
+              <button type="button" data-language="fr" aria-pressed="true"
+                aria-label="Français"
+                data-i18n-attrs="aria-label:language.fr">FR</button>
+              <button type="button" data-language="en" aria-pressed="false"
+                aria-label="English"
+                data-i18n-attrs="aria-label:language.en">EN</button>
             </div>
           </div>
           <div class="toolbar-action">
             <span><i class="fa-solid fa-display" aria-hidden="true"></i>
-              Affichage</span>
+              <span data-i18n="nav.display">Affichage</span></span>
             <button id="fullscreen-button" class="ghost-button" type="button"
               aria-label="Passer en plein écran (recommandé)"
-              title="Activer ou quitter le plein écran (recommandé)"><i
-                class="fa-solid fa-expand" aria-hidden="true"></i> Plein
-              écran</button>
+              title="Activer ou quitter le plein écran (recommandé)"
+              data-i18n-attrs="aria-label:nav.fullscreenAria;title:nav.fullscreenTitle"><i
+                class="fa-solid fa-expand" aria-hidden="true"></i> <span
+                data-i18n="nav.fullscreen">Plein écran</span></button>
           </div>
           <div class="toolbar-action">
             <span><i class="fa-solid fa-music" aria-hidden="true"></i>
-              Chart</span>
+              <span data-i18n="nav.chart">Chart</span></span>
             <button id="web-hero-chart-import" type="button"
               aria-label="Importer un dossier de chart avec notes, fichier INI et pistes audio"
-              title="Importer le dossier d’une chart et ses pistes audio"><i
+              title="Importer le dossier d’une chart et ses pistes audio"
+              data-i18n-attrs="aria-label:chart.importAria;title:chart.importTitle"><i
                 class="fa-solid fa-folder-open" aria-hidden="true"></i>
-              Importer un dossier</button>
+              <span data-i18n="chart.import">Importer un dossier</span></button>
           </div>
           <label class="field difficulty-field">
             <span><i class="fa-solid fa-gauge-high" aria-hidden="true"></i>
-              Difficulté</span>
+              <span data-i18n="difficulty.label">Difficulté</span></span>
             <span class="select-wrap">
               <select id="web-hero-difficulty"
                 aria-label="Difficulté de la chart"
-                title="Choisir la difficulté">
-                <option value="easy">Facile</option>
-                <option value="medium" selected>Moyen</option>
-                <option value="hard">Difficile</option>
-                <option value="expert">Expert</option>
+                title="Choisir la difficulté"
+                data-i18n-attrs="aria-label:difficulty.aria;title:difficulty.title">
+                <option value selected disabled
+                  data-i18n="difficulty.noChart">Importe une chart</option>
               </select>
               <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
             </span>
           </label>
           <button id="web-hero-start" class="primary-button" type="button"
-            aria-label="Démarrer la partie" title="Jouer la chart importée"><i
-              class="fa-solid fa-play" aria-hidden="true"></i> Jouer</button>
+            aria-label="Démarrer la partie" title="Jouer la chart importée"
+            data-i18n-attrs="aria-label:game.startAria;title:game.startTitle"><i
+              class="fa-solid fa-play" aria-hidden="true"></i> <span
+              data-i18n="game.start">Jouer</span></button>
           <div class="toolbar-action">
             <span><i class="fa-solid fa-gamepad" aria-hidden="true"></i>
-              Session</span>
+              <span data-i18n="nav.session">Session</span></span>
             <button id="web-hero-stop" type="button"
               aria-label="Arrêter la partie" title="Arrêter la partie en cours"
+              data-i18n-attrs="aria-label:game.stopAria;title:game.stopTitle"
               hidden><i class="fa-solid fa-stop" aria-hidden="true"></i>
-              Arrêter</button>
+              <span data-i18n="game.stop">Arrêter</span></button>
           </div>
         </div>
       </header>
 
       <span id="web-hero-status" role="status"><span
-          id="web-hero-status-text">Importe une chart pour
+          id="web-hero-status-text" data-i18n="status.importPrompt">Importe une
+          chart pour
           commencer.</span><progress id="web-hero-import-progress" max="1"
           value="0" hidden
-          aria-label="Progression du chargement"></progress></span>
+          aria-label="Progression du chargement"
+          data-i18n-attrs="aria-label:status.progressLabel"></progress></span>
 
       <main id="game-area" class="arena-shell" aria-label="Jeu WebHero"
+        data-i18n-attrs="aria-label:arena.label"
         tabindex="-1">
         <div class="web-hero-wrap">
           <canvas id="web-hero-canvas" tabindex="0"
             aria-label="Piste de jeu WebHero. Utilisez les touches D, F, J, K et L selon les lanes colorées."
+            data-i18n-attrs="aria-label:canvas.label"
+            data-i18n="canvas.fallback"
             aria-describedby="web-hero-instructions">Votre navigateur ne prend
             pas en charge le canvas.</canvas>
           <div class="arena-idle" aria-hidden="true">
-            <span class="idle-title">À TOI DE JOUER<span>!</span></span>
-            <span class="idle-caption">Importe le dossier d’une chart, puis
+            <span class="idle-title"><span data-i18n="idle.title">À TOI DE
+                JOUER</span><span>!</span></span>
+            <span class="idle-caption" data-i18n="idle.caption">Importe le
+              dossier d’une chart, puis
               lance la partie.</span>
             <img class="idle-logo" src="./assets/imgs/WH-LOGO.svg" alt />
           </div>
-          <p id="web-hero-instructions" class="visually-hidden">Choisissez une
+          <p id="web-hero-instructions" class="visually-hidden"
+            data-i18n="instructions.controls">Choisissez une
             chart et une difficulté, puis appuyez sur Jouer. Appuyez sur les
             touches D, F, J, K et L lorsque les notes atteignent la ligne de
-            frappe, ou utilisez les boutons tactiles.</p>
+            frappe, ou utilisez les boutons tactiles. Appuyez sur Espace lorsque
+            la jauge Star Power atteint 50 % pour doubler le score pendant 8
+            s.</p>
           <div id="web-hero-lyrics" class="lyrics" aria-live="polite"
             hidden></div>
           <section id="web-hero-pause" class="game-over" role="dialog"
             aria-labelledby="web-hero-pause-title" hidden>
             <div class="game-over-card">
               <div class="result-heading">
-                <span id="web-hero-pause-kicker">ÉCHAP pour reprendre · START
+                <span id="web-hero-pause-kicker" data-i18n="pause.kicker">ÉCHAP
+                  pour reprendre · START
                   sur la manette</span>
-                <h2 id="web-hero-pause-title">PAUSE</h2>
+                <h2 id="web-hero-pause-title" data-i18n="pause.title">PAUSE</h2>
               </div>
               <button id="web-hero-resume" class="result-replay" type="button"
-                aria-label="Reprendre la partie">
-                <span>Reprendre</span><i class="fa-solid fa-play"
+                aria-label="Reprendre la partie"
+                data-i18n-attrs="aria-label:pause.resumeAria">
+                <span data-i18n="pause.resume">Reprendre</span><i
+                  class="fa-solid fa-play"
                   aria-hidden="true"></i>
               </button>
               <button id="web-hero-quit" class="result-return" type="button"
-                aria-label="Abandonner la partie">
+                aria-label="Abandonner la partie"
+                data-i18n-attrs="aria-label:pause.quitAria">
                 <i class="fa-solid fa-stop"
-                  aria-hidden="true"></i><span>Abandonner la partie</span>
+                  aria-hidden="true"></i><span data-i18n="pause.quit">Abandonner
+                  la partie</span>
               </button>
             </div>
           </section>
@@ -138,60 +167,69 @@
             aria-labelledby="web-hero-result-title" hidden>
             <div class="game-over-card">
               <div class="result-heading">
-                <span id="web-hero-result-kicker">SESSION TERMINÉE</span>
-                <h2 id="web-hero-result-title">GAME OVER</h2>
+                <span id="web-hero-result-kicker"
+                  data-i18n="results.kicker">SESSION TERMINÉE</span>
+                <h2 id="web-hero-result-title" data-i18n="results.title">GAME
+                  OVER</h2>
                 <p id="web-hero-result-song" class="result-song"></p>
               </div>
               <div class="result-score">
                 <span><i class="fa-solid fa-trophy" aria-hidden="true"></i>
-                  SCORE FINAL</span>
+                  <span data-i18n="results.score">SCORE FINAL</span></span>
                 <strong id="web-hero-final-score">0</strong>
                 <span id="web-hero-final-fc" class="result-fc" hidden>
-                  <i class="fa-solid fa-crown" aria-hidden="true"></i> FC
+                  <i class="fa-solid fa-crown" aria-hidden="true"></i> <span
+                    data-i18n="results.fc">FC</span>
                 </span>
               </div>
               <div class="result-stats">
                 <div class="result-stat result-accuracy">
                   <span><i class="fa-solid fa-bullseye" aria-hidden="true"></i>
-                    Précision</span>
+                    <span data-i18n="results.accuracy">Précision</span></span>
                   <strong id="web-hero-final-accuracy">0%</strong>
                 </div>
                 <div class="result-stat">
                   <span><i class="fa-solid fa-clock" aria-hidden="true"></i>
-                    Durée</span>
+                    <span data-i18n="results.duration">Durée</span></span>
                   <strong id="web-hero-final-time">0s</strong>
                 </div>
                 <div class="result-stat">
                   <span><i class="fa-solid fa-music" aria-hidden="true"></i>
-                    Notes</span>
+                    <span data-i18n="results.notes">Notes</span></span>
                   <strong id="web-hero-final-notes">0</strong>
                 </div>
                 <div class="result-stat">
                   <span><i class="fa-solid fa-check-double"
-                      aria-hidden="true"></i> Hits / Misses</span>
+                      aria-hidden="true"></i> <span
+                      data-i18n="results.hitsMisses">Hits / Misses</span></span>
                   <strong id="web-hero-final-hits">0 / 0</strong>
                 </div>
                 <div class="result-stat result-delay">
                   <span><i class="fa-solid fa-stopwatch" aria-hidden="true"></i>
-                    Délai moyen</span>
+                    <span data-i18n="results.delay">Délai moyen</span></span>
                   <strong id="web-hero-final-delay">—</strong>
                 </div>
                 <div class="result-stat result-streak">
                   <span><i class="fa-solid fa-fire" aria-hidden="true"></i>
-                    Meilleure série</span>
+                    <span data-i18n="results.streak">Meilleure
+                      série</span></span>
                   <strong id="web-hero-final-streak">0</strong>
                 </div>
               </div>
               <button id="web-hero-restart" class="result-replay" type="button"
-                aria-label="Rejouer la chart" title="Recommencer cette chart">
-                <span>Rejouer</span><i class="fa-solid fa-rotate-right"
+                aria-label="Rejouer la chart" title="Recommencer cette chart"
+                data-i18n-attrs="aria-label:results.replayAria;title:results.replayTitle">
+                <span data-i18n="results.replay">Rejouer</span><i
+                  class="fa-solid fa-rotate-right"
                   aria-hidden="true"></i>
               </button>
               <button id="web-hero-return" class="result-return" type="button"
                 aria-label="Retourner à l’écran titre sans rejouer"
-                title="Fermer les résultats et revenir à l’écran titre">
+                title="Fermer les résultats et revenir à l’écran titre"
+                data-i18n-attrs="aria-label:results.returnAria;title:results.returnTitle">
                 <i class="fa-solid fa-arrow-left"
-                  aria-hidden="true"></i><span>Retour à l’écran titre</span>
+                  aria-hidden="true"></i><span data-i18n="results.return">Retour
+                  à l’écran titre</span>
               </button>
             </div>
           </section>
@@ -200,116 +238,150 @@
 
       <footer class="bottom-bar">
         <div class="settings-grid">
-          <section class="settings-panel" aria-label="Réglages de jeu">
+          <section class="settings-panel" aria-label="Réglages de jeu"
+            data-i18n-attrs="aria-label:settings.game">
             <div class="panel-head"><span class="footer-section-label"><i
                   class="fa-solid fa-sliders"
-                  aria-hidden="true"></i> Jeu</span></div>
+                  aria-hidden="true"></i> <span
+                  data-i18n="settings.game">Jeu</span></span></div>
             <div class="panel-body">
               <label class="speed-control">
                 <span><i class="fa-solid fa-gauge-high" aria-hidden="true"></i>
-                  <span class="speed-label-full">Vitesse</span><span
+                  <span class="speed-label-full"
+                    data-i18n="settings.speed">Vitesse</span><span
                     class="speed-label-short"
-                    aria-hidden="true">Vit.</span></span>
+                    aria-hidden="true"
+                    data-i18n="settings.speedShort">Vit.</span></span>
                 <input id="web-hero-chart-speed" type="range" min="0.5" max="1"
                   step="0.05" value="0.75"
                   aria-label="Vitesse de lecture de la chart"
                   aria-describedby="web-hero-chart-speed-value"
-                  title="Régler la vitesse de lecture" />
+                  title="Régler la vitesse de lecture"
+                  data-i18n-attrs="aria-label:settings.chartSpeedAria;title:settings.chartSpeedTitle" />
                 <output id="web-hero-chart-speed-value"
                   for="web-hero-chart-speed">75 %</output>
               </label>
               <label class="speed-control"
                 aria-label="Vitesse de défilement des notes"
-                title="Vitesse de défilement des notes">
+                title="Vitesse de défilement des notes"
+                data-i18n-attrs="aria-label:settings.hyperspeedAria;title:settings.hyperspeedAria">
                 <span><i class="fa-solid fa-bolt" aria-hidden="true"></i>
-                  <span class="speed-label-full">Hyperspeed</span><span
+                  <span class="speed-label-full"
+                    data-i18n="settings.hyperspeed">Hyperspeed</span><span
                     class="speed-label-short"
-                    aria-hidden="true">Hyper.</span></span>
+                    aria-hidden="true"
+                    data-i18n="settings.hyperspeedShort">Hyper.</span></span>
                 <input id="web-hero-hyperspeed" type="range" min="0.8" max="2.5"
                   step="0.1" value="1.5"
                   aria-label="Vitesse de défilement des notes"
                   aria-describedby="web-hero-hyperspeed-value"
-                  title="Vitesse de défilement des notes" />
+                  title="Vitesse de défilement des notes"
+                  data-i18n-attrs="aria-label:settings.hyperspeedAria;title:settings.hyperspeedAria" />
                 <output id="web-hero-hyperspeed-value"
                   for="web-hero-hyperspeed">1.5×</output>
               </label>
               <label class="speed-control nofail"
-                title="Pas de stage presence ni de game over ; score non enregistré">
+                title="Pas de stage presence ni de game over ; score non enregistré"
+                data-i18n-attrs="title:settings.noFailTitle">
                 <input id="web-hero-nofail" type="checkbox" />
                 <span><i class="fa-solid fa-shield-halved"
                     aria-hidden="true"></i>
-                  No-Fail Mode</span>
+                  <span data-i18n="settings.noFail">No-Fail Mode</span></span>
               </label>
               <label class="speed-control nofail">
                 <input id="web-hero-practice" type="checkbox" />
                 <span><i class="fa-solid fa-repeat" aria-hidden="true"></i>
-                  Practice</span>
+                  <span data-i18n="settings.practice">Practice</span></span>
               </label>
               <label class="speed-control practice-section-control">
-                <span>Début</span>
+                <span data-i18n="settings.start">Début</span>
                 <span class="select-wrap">
                   <select id="web-hero-practice-start-section" disabled>
-                    <option value="-1">Début de la chart</option>
+                    <option value="-1" data-i18n="settings.chartBeginning">Début
+                      de la chart</option>
                   </select>
                   <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
                 </span>
               </label>
               <label class="speed-control practice-section-control">
-                <span>Fin</span>
+                <span data-i18n="settings.end">Fin</span>
                 <span class="select-wrap">
                   <select id="web-hero-practice-end-section" disabled>
-                    <option value="-1">Fin de la chart</option>
+                    <option value="-1" data-i18n="settings.chartEnd">Fin de la
+                      chart</option>
                   </select>
                   <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
                 </span>
               </label>
+              <button id="web-hero-chart-unload"
+                class="background-clear chart-unload"
+                type="button" disabled aria-label="Décharger la chart courante"
+                title="Décharger la chart et supprimer sa sauvegarde locale"
+                data-i18n-attrs="aria-label:chart.unloadAria;title:chart.unloadTitle">
+                <i class="fa-solid fa-eject" aria-hidden="true"></i>
+                <span data-i18n="chart.unload">Décharger la chart</span>
+              </button>
             </div>
           </section>
-          <section class="settings-panel" aria-label="Calibration">
+          <section class="settings-panel" aria-label="Calibration"
+            data-i18n-attrs="aria-label:settings.calibration">
             <div class="panel-head"><span class="footer-section-label"><i
                   class="fa-solid fa-sliders"
-                  aria-hidden="true"></i> Calibration</span></div>
+                  aria-hidden="true"></i> <span
+                  data-i18n="settings.calibration">Calibration</span></span></div>
             <div class="panel-body">
               <label class="speed-control"
-                title="Négatif : musique plus tôt (compense un audio en retard, ex. Bluetooth)">
+                title="Négatif : musique plus tôt (compense un audio en retard, ex. Bluetooth)"
+                data-i18n-attrs="title:settings.audioDelayTitle">
                 <span><i class="fa-solid fa-volume-high" aria-hidden="true"></i>
-                  <span class="speed-label-full">Délai audio</span><span
+                  <span class="speed-label-full"
+                    data-i18n="settings.audioDelay">Délai audio</span><span
                     class="speed-label-short"
-                    aria-hidden="true">Aud.</span></span>
+                    aria-hidden="true"
+                    data-i18n="settings.audioShort">Aud.</span></span>
                 <input id="web-hero-audio-delay" type="range" min="-300"
                   max="300"
                   step="5" value="0" aria-label="Délai audio en millisecondes"
-                  aria-describedby="web-hero-audio-delay-value" />
+                  aria-describedby="web-hero-audio-delay-value"
+                  data-i18n-attrs="aria-label:settings.audioDelayAria" />
                 <output id="web-hero-audio-delay-value"
                   for="web-hero-audio-delay">0 ms</output>
               </label>
               <label class="speed-control"
-                title="Positif : notes affichées plus tôt (compense un écran en retard)">
+                title="Positif : notes affichées plus tôt (compense un écran en retard)"
+                data-i18n-attrs="title:settings.videoDelayTitle">
                 <span><i class="fa-solid fa-tv" aria-hidden="true"></i>
-                  <span class="speed-label-full">Délai vidéo</span><span
+                  <span class="speed-label-full"
+                    data-i18n="settings.videoDelay">Délai vidéo</span><span
                     class="speed-label-short"
-                    aria-hidden="true">Vid.</span></span>
+                    aria-hidden="true"
+                    data-i18n="settings.videoShort">Vid.</span></span>
                 <input id="web-hero-video-delay" type="range" min="-300"
                   max="300"
                   step="5" value="0" aria-label="Délai vidéo en millisecondes"
-                  aria-describedby="web-hero-video-delay-value" />
+                  aria-describedby="web-hero-video-delay-value"
+                  data-i18n-attrs="aria-label:settings.videoDelayAria" />
                 <output id="web-hero-video-delay-value"
                   for="web-hero-video-delay">0 ms</output>
               </label>
               <label class="speed-control nofail">
                 <input id="web-hero-hit-zone-preview" type="checkbox" />
                 <span><i class="fa-solid fa-bullseye" aria-hidden="true"></i>
-                  Aperçu hitzone calibrée</span>
+                  <span data-i18n="settings.hitZonePreview">Aperçu hitzone
+                    calibrée</span></span>
               </label>
             </div>
           </section>
           <section class="settings-panel key-row" role="group"
-            aria-label="Configuration de la manette">
+            aria-label="Configuration de la manette"
+            data-i18n-attrs="aria-label:controller.config">
             <div class="panel-head">
               <span class="footer-section-label"><i class="fa-solid fa-gamepad"
-                  aria-hidden="true"></i> Manette</span>
+                  aria-hidden="true"></i> <span
+                  data-i18n="controller.label">Manette</span></span>
               <output id="web-hero-pad-debug" class="footer-section-label"
-                title="Boutons et axes détectés"></output>
+                title="Boutons et axes détectés"
+                data-i18n-attrs="title:controller.debugTitle"></output>
             </div>
             <div class="panel-body key-grid">
               <label><span class="lane lane-0"
@@ -332,123 +404,173 @@
                   aria-hidden="true">●</span><button
                   class="web-hero-pad" type="button"
                   title="Cliquer puis appuyer sur un bouton de la manette"></button></label>
-              <label class="pause-map" title="Bouton de pause"><i
+              <label class="pause-map" title="Bouton de pause"
+                data-i18n-attrs="title:controller.pause"><i
                   class="fa-solid fa-pause" aria-hidden="true"></i><button
                   class="web-hero-pad" type="button"
                   aria-label="Bouton de pause de la manette"
-                  title="Cliquer puis appuyer sur un bouton de la manette"></button></label>
-              <label class="pause-map" title="Strum haut"><i
+                  title="Cliquer puis appuyer sur un bouton de la manette"
+                  data-i18n-attrs="aria-label:controller.pauseAria;title:controller.learnTitle"></button></label>
+              <label class="pause-map" title="Strum haut"
+                data-i18n-attrs="title:controller.strumUp"><i
                   class="fa-solid fa-arrow-up" aria-hidden="true"></i><button
                   class="web-hero-pad" type="button"
                   aria-label="Bouton de strum haut de la manette"
-                  title="Cliquer puis appuyer sur un bouton de la manette"></button></label>
-              <label class="pause-map" title="Strum bas"><i
+                  title="Cliquer puis appuyer sur un bouton de la manette"
+                  data-i18n-attrs="aria-label:controller.strumUpAria;title:controller.learnTitle"></button></label>
+              <label class="pause-map" title="Strum bas"
+                data-i18n-attrs="title:controller.strumDown"><i
                   class="fa-solid fa-arrow-down" aria-hidden="true"></i><button
                   class="web-hero-pad" type="button"
                   aria-label="Bouton de strum bas de la manette"
-                  title="Cliquer puis appuyer sur un bouton de la manette"></button></label>
+                  title="Cliquer puis appuyer sur un bouton de la manette"
+                  data-i18n-attrs="aria-label:controller.strumDownAria;title:controller.learnTitle"></button></label>
+              <label class="pause-map" title="Star Power"
+                data-i18n-attrs="title:controller.starPower"><i
+                  class="fa-solid fa-star" aria-hidden="true"></i><button
+                  class="web-hero-pad" type="button"
+                  aria-label="Bouton Star Power de la manette"
+                  title="Cliquer puis appuyer sur un bouton de la manette"
+                  data-i18n-attrs="aria-label:controller.starPowerAria;title:controller.learnTitle"></button></label>
             </div>
           </section>
           <section class="settings-panel key-row" role="group"
-            aria-label="Configuration des touches de jeu">
+            aria-label="Configuration des touches de jeu"
+            data-i18n-attrs="aria-label:keyboard.config">
             <div class="panel-head"><span class="footer-section-label"><i
                   class="fa-regular fa-keyboard"
-                  aria-hidden="true"></i> Clavier</span></div>
+                  aria-hidden="true"></i> <span
+                  data-i18n="keyboard.label">Clavier</span></span></div>
             <div class="panel-body key-grid">
               <label><span class="lane lane-0"
                   aria-hidden="true">●</span><button
                   class="web-hero-key" type="button"
                   aria-label="Touche de jeu pour la lane rouge"
-                  title="Cliquer puis appuyer sur une touche">D</button></label>
+                  title="Cliquer puis appuyer sur une touche"
+                  data-i18n-attrs="aria-label:keyboard.laneRed;title:keyboard.learnTitle">D</button></label>
               <label><span class="lane lane-1"
                   aria-hidden="true">●</span><button
                   class="web-hero-key" type="button"
                   aria-label="Touche de jeu pour la lane orange"
-                  title="Cliquer puis appuyer sur une touche">F</button></label>
+                  title="Cliquer puis appuyer sur une touche"
+                  data-i18n-attrs="aria-label:keyboard.laneOrange;title:keyboard.learnTitle">F</button></label>
               <label><span class="lane lane-2"
                   aria-hidden="true">●</span><button
                   class="web-hero-key" type="button"
                   aria-label="Touche de jeu pour la lane jaune"
-                  title="Cliquer puis appuyer sur une touche">J</button></label>
+                  title="Cliquer puis appuyer sur une touche"
+                  data-i18n-attrs="aria-label:keyboard.laneYellow;title:keyboard.learnTitle">J</button></label>
               <label><span class="lane lane-3"
                   aria-hidden="true">●</span><button
                   class="web-hero-key" type="button"
                   aria-label="Touche de jeu pour la lane verte"
-                  title="Cliquer puis appuyer sur une touche">K</button></label>
+                  title="Cliquer puis appuyer sur une touche"
+                  data-i18n-attrs="aria-label:keyboard.laneGreen;title:keyboard.learnTitle">K</button></label>
               <label><span class="lane lane-4"
                   aria-hidden="true">●</span><button
                   class="web-hero-key" type="button"
                   aria-label="Touche de jeu pour la lane bleue"
-                  title="Cliquer puis appuyer sur une touche">L</button></label>
-              <label class="pause-map" title="Touche de pause"><i
+                  title="Cliquer puis appuyer sur une touche"
+                  data-i18n-attrs="aria-label:keyboard.laneBlue;title:keyboard.learnTitle">L</button></label>
+              <label class="pause-map" title="Touche de pause"
+                data-i18n-attrs="title:keyboard.pause"><i
                   class="fa-solid fa-pause" aria-hidden="true"></i><button
                   id="web-hero-pause-key" type="button"
                   aria-label="Touche de pause"
-                  title="Cliquer puis appuyer sur une touche"></button></label>
-              <label class="pause-map" title="Strum haut"><i
+                  title="Cliquer puis appuyer sur une touche"
+                  data-i18n-attrs="aria-label:keyboard.pause;title:keyboard.learnTitle"></button></label>
+              <label class="pause-map" title="Strum haut"
+                data-i18n-attrs="title:keyboard.strumUp"><i
                   class="fa-solid fa-arrow-up" aria-hidden="true"></i><button
                   class="web-hero-strum-key" type="button"
                   aria-label="Touche de strum haut"
-                  title="Cliquer puis appuyer sur une touche"></button></label>
-              <label class="pause-map" title="Strum bas"><i
+                  title="Cliquer puis appuyer sur une touche"
+                  data-i18n-attrs="aria-label:keyboard.strumUp;title:keyboard.learnTitle"></button></label>
+              <label class="pause-map" title="Strum bas"
+                data-i18n-attrs="title:keyboard.strumDown"><i
                   class="fa-solid fa-arrow-down" aria-hidden="true"></i><button
                   class="web-hero-strum-key" type="button"
                   aria-label="Touche de strum bas"
-                  title="Cliquer puis appuyer sur une touche"></button></label>
+                  title="Cliquer puis appuyer sur une touche"
+                  data-i18n-attrs="aria-label:keyboard.strumDown;title:keyboard.learnTitle"></button></label>
             </div>
           </section>
           <section class="settings-panel" role="group"
-            aria-label="Personnalisation de l’interface">
+            aria-label="Personnalisation de l’interface"
+            data-i18n-attrs="aria-label:custom.panel">
             <div class="panel-head"><span class="footer-section-label"><i
-                  class="fa-solid fa-user-pen"></i> Custom</span></div>
+                  class="fa-solid fa-user-pen"></i> <span
+                  data-i18n="custom.label">Custom</span></span></div>
             <div class="panel-body custom-settings">
               <label class="custom-color-control">
                 <span><i class="fa-solid fa-palette" aria-hidden="true"></i>
-                  Couleur principale</span>
+                  <span data-i18n="custom.primaryColor">Couleur
+                    principale</span></span>
                 <input id="web-hero-primary-color" type="color"
                   value="#ffd400"
-                  aria-label="Couleur principale de l’interface" />
+                  aria-label="Couleur principale de l’interface"
+                  data-i18n-attrs="aria-label:custom.primaryColorAria" />
               </label>
               <label class="custom-background-control">
                 <span><i class="fa-regular fa-image" aria-hidden="true"></i>
-                  Fond du highway</span>
+                  <span data-i18n="custom.background">Fond du
+                    highway</span></span>
                 <input id="web-hero-highway-background" type="file"
                   accept="image/*"
-                  aria-label="Choisir une image de fond du highway" />
-                <output id="web-hero-background-name">Aucune image</output>
+                  aria-label="Choisir une image de fond du highway"
+                  data-i18n-attrs="aria-label:custom.backgroundAria" />
+                <output id="web-hero-background-name"
+                  data-i18n="custom.noImage">Aucune image</output>
               </label>
               <button id="web-hero-background-clear" class="background-clear"
-                type="button" disabled>
+                type="button" disabled aria-label="Retirer l’image"
+                data-i18n-attrs="aria-label:custom.removeAria">
                 <i class="fa-solid fa-trash" aria-hidden="true"></i>
-                Retirer l’image
+                <span data-i18n="custom.removeImage">Retirer l’image</span>
               </button>
             </div>
           </section>
         </div>
-        <div class="touch-controls" role="group" aria-label="Touches tactiles">
+        <div class="touch-controls" role="group" aria-label="Touches tactiles"
+          data-i18n-attrs="aria-label:touch.group">
           <button class="touch-lane lane-0" type="button"
-            aria-label="Jouer la lane rouge" title="Activer la lane rouge"><span
+            aria-label="Jouer la lane rouge" title="Activer la lane rouge"
+            data-i18n-attrs="aria-label:touch.laneRed;title:touch.activateLaneRed"><span
               aria-hidden="true">●</span></button>
           <button class="touch-lane lane-1" type="button"
             aria-label="Jouer la lane orange"
-            title="Activer la lane orange"><span
+            title="Activer la lane orange"
+            data-i18n-attrs="aria-label:touch.laneOrange;title:touch.activateLaneOrange"><span
               aria-hidden="true">●</span></button>
           <button class="touch-lane lane-2" type="button"
-            aria-label="Jouer la lane jaune" title="Activer la lane jaune"><span
+            aria-label="Jouer la lane jaune" title="Activer la lane jaune"
+            data-i18n-attrs="aria-label:touch.laneYellow;title:touch.activateLaneYellow"><span
               aria-hidden="true">●</span></button>
           <button class="touch-lane lane-3" type="button"
-            aria-label="Jouer la lane verte" title="Activer la lane verte"><span
+            aria-label="Jouer la lane verte" title="Activer la lane verte"
+            data-i18n-attrs="aria-label:touch.laneGreen;title:touch.activateLaneGreen"><span
               aria-hidden="true">●</span></button>
           <button class="touch-lane lane-4" type="button"
-            aria-label="Jouer la lane bleue" title="Activer la lane bleue"><span
+            aria-label="Jouer la lane bleue" title="Activer la lane bleue"
+            data-i18n-attrs="aria-label:touch.laneBlue;title:touch.activateLaneBlue"><span
               aria-hidden="true">●</span></button>
           <button id="web-hero-touch-pause" class="touch-pause" type="button"
-            aria-label="Mettre le jeu en pause"><i class="fa-solid fa-pause"
-              aria-hidden="true"></i><span>Pause</span></button>
+            aria-label="Mettre le jeu en pause"
+            data-i18n-attrs="aria-label:touch.pause"><i
+              class="fa-solid fa-pause"
+              aria-hidden="true"></i><span
+              data-i18n="touch.pauseText">Pause</span></button>
+          <button id="web-hero-touch-starpower" class="touch-starpower"
+            type="button" aria-label="Activer le Star Power"
+            title="Activer le Star Power"
+            data-i18n-attrs="aria-label:touch.starPower;title:touch.starPower"><i
+              class="fa-solid fa-star"
+              aria-hidden="true"></i></button>
         </div>
         <input id="web-hero-chart-file" type="file"
           aria-label="Sélectionner le dossier d’une chart, avec son fichier INI et ses pistes audio"
           title="Sélectionner le dossier d’une seule chart"
+          data-i18n-attrs="aria-label:file.chart;title:file.chartTitle"
           accept=".chart,.mid,.midi,.ini,.aac,.flac,.m4a,.mp3,.ogg,.opus,.wav"
           webkitdirectory directory multiple hidden />
       </footer>

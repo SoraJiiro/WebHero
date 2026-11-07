@@ -14,6 +14,7 @@ import {
 import { parseSongIni, selectChartFolderFiles } from "./chart-import.mjs";
 import {
   markLastChartPlayed,
+  removeLastChart,
   restoreLastChart,
   saveLastChart,
 } from "./chart-storage.mjs";
@@ -39,6 +40,13 @@ import {
   loadKeys,
   selectChartTrack,
 } from "./utils.js";
+import {
+  formatNumber,
+  initI18n,
+  setI18nText,
+  t,
+  translateError,
+} from "./i18n.mjs";
 
 const DEFAULT_KEYS = ["d", "f", "j", "k", "l"];
 const LANE_RANKS = [0, 1, 2, 3, 4];
@@ -57,11 +65,13 @@ const DIFFICULTIES = {
 const DIFFICULTY_ORDER = Object.keys(DIFFICULTIES);
 
 export function initWebHero(socket = null) {
+  initI18n();
   const stage = document.getElementById("jeu");
   const canvas = document.getElementById("web-hero-canvas");
   const startButton = document.getElementById("web-hero-start");
   const stopButton = document.getElementById("web-hero-stop");
   const chartImportButton = document.getElementById("web-hero-chart-import");
+  const chartUnloadButton = document.getElementById("web-hero-chart-unload");
   const chartFileInput = document.getElementById("web-hero-chart-file");
   const difficultySelect = document.getElementById("web-hero-difficulty");
   const chartSpeedInput = document.getElementById("web-hero-chart-speed");
@@ -99,6 +109,7 @@ export function initWebHero(socket = null) {
     !startButton ||
     !stopButton ||
     !chartImportButton ||
+    !chartUnloadButton ||
     !chartFileInput ||
     !difficultySelect ||
     !chartSpeedInput ||
@@ -116,7 +127,11 @@ export function initWebHero(socket = null) {
     return;
 
   const statusEl = document.getElementById("web-hero-status-text");
+  const setStatus = (key, values = {}) => setI18nText(statusEl, key, values);
   const touchPauseButton = document.getElementById("web-hero-touch-pause");
+  const touchStarPowerButton = document.getElementById(
+    "web-hero-touch-starpower",
+  );
   const importProgress = document.getElementById("web-hero-import-progress");
   const gameOverEl = document.getElementById("web-hero-game-over");
   const restartButton = document.getElementById("web-hero-restart");
@@ -136,6 +151,9 @@ export function initWebHero(socket = null) {
   const resumeButton = document.getElementById("web-hero-resume");
   const quitButton = document.getElementById("web-hero-quit");
   const noFailInput = document.getElementById("web-hero-nofail");
+  document.addEventListener("webhero:languagechange", () =>
+    draw(performance.now()),
+  );
   let lyricSpans = [];
   const state = {
     running: false,
@@ -153,6 +171,10 @@ export function initWebHero(socket = null) {
     combo: 0,
     fullComboBroken: false,
     multiplier: 1,
+    starPowerCharge: 0,
+    starPowerActivatedAt: 0,
+    starPowerActiveUntil: 0,
+    starPowerPhrases: [],
     maxCombo: 0,
     misses: 0,
     hits: 0,
@@ -191,8 +213,8 @@ export function initWebHero(socket = null) {
     heldSig: "",
     viewWidth: 0,
     viewHeight: 0,
-    difficulty: difficultySelect.value,
-    chartDifficulty: difficultySelect.value,
+    difficulty: difficultySelect.value || "medium",
+    chartDifficulty: difficultySelect.value || "medium",
     scoreMultiplier: 1,
   };
 
@@ -223,7 +245,7 @@ export function initWebHero(socket = null) {
       savedSettings = parsedSettings;
   } catch (error) {
     console.error("Impossible de lire les paramètres Web Hero.", error);
-    statusEl.textContent = "Paramètres Web Hero locaux illisibles.";
+    setStatus("status.settingsReadFailed");
   }
   if (DIFFICULTIES[savedSettings.difficulty]) {
     difficultySelect.value = savedSettings.difficulty;
@@ -274,7 +296,7 @@ export function initWebHero(socket = null) {
       localStorage.setItem(
         SETTINGS_KEY,
         JSON.stringify({
-          difficulty: difficultySelect.value,
+          difficulty: state.difficulty,
           chartSpeed: Number(chartSpeedInput.value),
           hyperspeed: Number(hyperspeedInput.value),
           audioDelay: Number(audioDelayInput.value),
@@ -290,15 +312,14 @@ export function initWebHero(socket = null) {
         "Impossible de sauvegarder les paramètres Web Hero.",
         error,
       );
-      if (!state.running)
-        statusEl.textContent =
-          "Impossible de sauvegarder les paramètres Web Hero localement.";
+      if (!state.running) setStatus("status.settingsSaveFailed");
     }
   }
 
   function setChartControlsDisabled(disabled) {
     chartImportButton.disabled = disabled;
-    difficultySelect.disabled = disabled;
+    difficultySelect.disabled = disabled || !state.chart;
+    chartUnloadButton.disabled = disabled || !state.chart;
     chartSpeedInput.disabled = disabled;
     hyperspeedInput.disabled = disabled;
     audioDelayInput.disabled = disabled;
@@ -433,7 +454,7 @@ export function initWebHero(socket = null) {
       );
       draw(now + state.videoDelay);
       if (state.fadeAlpha === 1) {
-        finish("Chart terminée", { completed: true });
+        finish("status.chartFinished", { completed: true });
         return;
       }
       state.animation = requestAnimationFrame(frame);
@@ -469,6 +490,8 @@ export function initWebHero(socket = null) {
         lane: pendingNote.lane,
         spawnAt: pendingNote.spawnAt,
         travelTime: pendingNote.travelTime,
+        starPowerPhrase: pendingNote.starPowerPhrase,
+        starPowerPhraseEndAt: pendingNote.starPowerPhraseEndAt,
         hitAt,
         hitUntil,
         missAt: Math.max(hitUntil + 50, hitAt + GUITAR_WINDOW + 50),
@@ -530,6 +553,7 @@ export function initWebHero(socket = null) {
       )
         state.notes.splice(index, 1);
     }
+    settleStarPowerPhrases(now);
     if (
       state.pendingNotes.length === 0 &&
       state.notes.length === 0 &&
@@ -577,7 +601,7 @@ export function initWebHero(socket = null) {
       false,
     );
     if (state.stagePresence <= 0) {
-      finish("Stage presence épuisée");
+      finish("status.stageFailed");
     }
   }
 
@@ -611,7 +635,7 @@ export function initWebHero(socket = null) {
   }
 
   function finish(
-    message = "Partie terminee",
+    messageKey = "status.finished",
     { completed = false, stopped = false } = {},
   ) {
     if (!state.running) return;
@@ -632,27 +656,35 @@ export function initWebHero(socket = null) {
     state.maxCombo = Math.max(state.maxCombo, state.combo);
     startButton.disabled = false;
     stopButton.hidden = true;
-    statusEl.textContent = `${message} - ${state.score} points`;
+    setStatus("status.gameFinished", {
+      message: () => t(messageKey),
+      score: formatNumber(state.score),
+    });
     const finalDuration = Math.floor(duration);
     const accuracy =
       state.hits + state.misses
         ? Math.round((state.hits / (state.hits + state.misses)) * 100)
         : 0;
-    gameOverTitleEl.textContent = completed
-      ? "CHART TERMINÉE"
-      : stopped
-        ? "PARTIE ARRÊTÉE"
-        : "GAME OVER";
+    setI18nText(
+      gameOverTitleEl,
+      completed
+        ? "game.chartComplete"
+        : stopped
+          ? "game.stopped"
+          : "game.gameOver",
+    );
     gameOverSongEl.textContent = state.chartTitle;
     gameOverEl.classList.toggle("is-completed", completed);
     gameOverEl.classList.toggle("is-stopped", stopped);
-    finalScoreEl.textContent = state.score.toLocaleString("fr-FR");
+    finalScoreEl.textContent = formatNumber(state.score);
     finalFcEl.hidden = !completed || getFullComboStatus(state) !== "complete";
-    finalTimeEl.textContent = `${finalDuration}s`;
+    setI18nText(finalTimeEl, "results.durationValue", {
+      seconds: finalDuration,
+    });
     finalAccuracyEl.textContent = `${accuracy}%`;
-    finalNotesEl.textContent = state.totalNotes.toLocaleString("fr-FR");
+    finalNotesEl.textContent = formatNumber(state.totalNotes);
     finalHitsEl.textContent = `${state.hits} / ${state.misses}`;
-    finalStreakEl.textContent = state.maxCombo.toLocaleString("fr-FR");
+    finalStreakEl.textContent = formatNumber(state.maxCombo);
     const averageHitDelay = state.hits
       ? Math.round(state.hitDelayTotal / state.hits)
       : null;
@@ -693,9 +725,13 @@ export function initWebHero(socket = null) {
         "sustainStartedAt",
         "releasedAt",
         "lastParticleAt",
+        "starPowerPhraseEndAt",
       ),
     );
-    state.pendingNotes.forEach((n) => shift(n, "spawnAt"));
+    state.pendingNotes.forEach((n) =>
+      shift(n, "spawnAt", "starPowerPhraseEndAt"),
+    );
+    state.starPowerPhrases.forEach((phrase) => shift(phrase, "endAt"));
     state.lyrics.forEach((l) => shift(l, "at"));
     state.lyricPhrases.forEach((p) =>
       p.syllables.forEach((s) => shift(s, "at")),
@@ -711,6 +747,8 @@ export function initWebHero(socket = null) {
       "lastHitAt",
       "lastFretAt",
       "lastFrame",
+      "starPowerActivatedAt",
+      "starPowerActiveUntil",
     );
   }
 
@@ -732,13 +770,25 @@ export function initWebHero(socket = null) {
     const upcoming = state.notes.filter((n) => !n.hitRegistered && !n.missed);
     state.notes = state.notes.filter((n) => n.hitRegistered || n.missed);
     state.pendingNotes.unshift(
-      ...upcoming.map(({ lane, spawnAt, travelTime, sustain, type }) => ({
-        lane,
-        spawnAt,
-        travelTime,
-        sustain,
-        type,
-      })),
+      ...upcoming.map(
+        ({
+          lane,
+          spawnAt,
+          travelTime,
+          sustain,
+          type,
+          starPowerPhrase,
+          starPowerPhraseEndAt,
+        }) => ({
+          lane,
+          spawnAt,
+          travelTime,
+          sustain,
+          type,
+          starPowerPhrase,
+          starPowerPhraseEndAt,
+        }),
+      ),
     );
     state.pendingNotes.forEach((n) => (n.spawnAt += ms));
     state.lyrics.forEach((l) => (l.at += ms));
@@ -787,6 +837,10 @@ export function initWebHero(socket = null) {
             ...note,
             time: note.time - segmentStart,
             sustain: Math.min(note.sustain, segmentEnd - note.time),
+            starPowerPhraseEnd:
+              note.starPowerPhraseEnd === undefined
+                ? undefined
+                : Math.min(note.starPowerPhraseEnd, segmentEnd) - segmentStart,
           })),
         duration: segmentEnd - segmentStart,
       },
@@ -844,6 +898,7 @@ export function initWebHero(socket = null) {
       state.chartSpeed,
     );
     state.chartDuration = schedule.duration;
+    state.starPowerPhrases = schedule.starPowerPhrases;
     state.startedAt = schedule.startAt;
     return schedule;
   }
@@ -854,6 +909,9 @@ export function initWebHero(socket = null) {
     state.combo = 0;
     state.fullComboBroken = false;
     state.multiplier = 1;
+    state.starPowerCharge = 0;
+    state.starPowerActivatedAt = 0;
+    state.starPowerActiveUntil = 0;
     state.maxCombo = 0;
     state.hits = 0;
     state.misses = 0;
@@ -921,8 +979,7 @@ export function initWebHero(socket = null) {
   async function start() {
     if (state.running) return;
     if (!state.chart) {
-      statusEl.textContent =
-        "Importez un fichier .chart ou .mid pour commencer.";
+      setStatus("status.importPromptShort");
       return;
     }
     startButton.disabled = true;
@@ -936,7 +993,9 @@ export function initWebHero(socket = null) {
     } catch (error) {
       startButton.disabled = false;
       setChartControlsDisabled(false);
-      statusEl.textContent = `Préparation audio impossible : ${error.message}`;
+      setStatus("status.audioPrepareFailed", {
+        error: () => translateError(error),
+      });
       console.error("Impossible de préparer la bande-son importée.", error);
       return;
     }
@@ -948,9 +1007,9 @@ export function initWebHero(socket = null) {
           restored.audioRestored
         )
           audioBuffers = restored.audioBuffers;
-        else storageWarning = " — audio mémorisé indisponible";
+        else storageWarning = "status.audioUnavailable";
       } catch {
-        storageWarning = " — audio mémorisé indisponible";
+        storageWarning = "status.audioUnavailable";
       }
     }
     state.difficulty = difficultySelect.value;
@@ -984,6 +1043,9 @@ export function initWebHero(socket = null) {
     state.score = 0;
     state.combo = 0;
     state.multiplier = 1;
+    state.starPowerCharge = 0;
+    state.starPowerActivatedAt = 0;
+    state.starPowerActiveUntil = 0;
     state.maxCombo = 0;
     state.misses = 0;
     state.hits = 0;
@@ -1010,7 +1072,12 @@ export function initWebHero(socket = null) {
     stopButton.hidden = false;
     stopButton.disabled = false;
     setChartControlsDisabled(true);
-    statusEl.textContent = `En jeu — ${DIFFICULTIES[chartDifficulty].label} (${chartTrack.name})${storageWarning}`;
+    setStatus("status.running", {
+      difficulty: () => t(`difficulty.${chartDifficulty}`),
+      track: chartTrack.name,
+      warning: () =>
+        `${storageWarning ? t(storageWarning) : ""}${audioBuffers.length ? "" : t("status.noAudio")}`,
+    });
     state.animation = requestAnimationFrame(frame);
     if (audioBuffers.length) {
       playAudio(
@@ -1021,8 +1088,6 @@ export function initWebHero(socket = null) {
           ? state.practiceRange.end - state.practiceRange.start
           : undefined,
       );
-    } else {
-      statusEl.textContent += " — aucune bande-son associée";
     }
   }
 
@@ -1054,7 +1119,41 @@ export function initWebHero(socket = null) {
     state.maxCombo = Math.max(state.maxCombo, state.combo);
     state.multiplier = getWebHeroMultiplier(state.combo);
     state.stagePresence = adjustWebHeroStagePresence(state.stagePresence, true);
-    state.score += Math.round(100 * state.multiplier * state.scoreMultiplier);
+    state.score += Math.round(
+      100 * state.multiplier * state.scoreMultiplier * getStarPowerFactor(now),
+    );
+    const phrase = state.starPowerPhrases.find(
+      (item) => item.id === hitNote.starPowerPhrase,
+    );
+    if (phrase) phrase.hits = (phrase.hits || 0) + 1;
+  }
+
+  function getStarPowerFactor(now) {
+    return state.starPowerActiveUntil > now ? 2 : 1;
+  }
+
+  function settleStarPowerPhrases(now) {
+    for (const phrase of state.starPowerPhrases) {
+      if (phrase.settled || now < phrase.endAt + 300) continue;
+      phrase.settled = true;
+      if (phrase.hits === phrase.noteCount)
+        state.starPowerCharge = Math.min(100, state.starPowerCharge + 25);
+    }
+  }
+
+  function activateStarPower() {
+    const now = performance.now();
+    if (
+      !state.running ||
+      state.paused ||
+      state.ending ||
+      state.starPowerCharge < 50 ||
+      state.starPowerActiveUntil > now
+    )
+      return;
+    state.starPowerCharge -= 50;
+    state.starPowerActivatedAt = now;
+    state.starPowerActiveUntil = now + 8000;
   }
 
   function creditSustain(note, at) {
@@ -1063,18 +1162,26 @@ export function initWebHero(socket = null) {
       Math.max(0, (at - note.sustainStartedAt) / 1000),
     );
     const scoredSeconds = note.sustainScoredSeconds || 0;
-    state.score +=
+    const scoreSustain = (seconds) =>
       getWebHeroSustainBonus(
-        heldSeconds,
-        note.holdMultiplier,
-        state.scoreMultiplier,
-      ) -
-      getWebHeroSustainBonus(
-        scoredSeconds,
+        seconds,
         note.holdMultiplier,
         state.scoreMultiplier,
       );
+    state.score += scoreSustain(heldSeconds) - scoreSustain(scoredSeconds);
+    const segmentStart = note.sustainStartedAt + scoredSeconds * 1000;
+    const segmentEnd = note.sustainStartedAt + heldSeconds * 1000;
+    const poweredSeconds =
+      Math.max(
+        0,
+        Math.min(segmentEnd, state.starPowerActiveUntil) -
+          Math.max(segmentStart, state.starPowerActivatedAt),
+      ) / 1000;
+    const scoredPoweredSeconds = note.sustainPoweredSeconds || 0;
+    state.score +=
+      scoreSustain(poweredSeconds) - scoreSustain(scoredPoweredSeconds);
     note.sustainScoredSeconds = heldSeconds;
+    note.sustainPoweredSeconds = poweredSeconds;
     return heldSeconds;
   }
 
@@ -1355,13 +1462,15 @@ export function initWebHero(socket = null) {
 
   startButton.addEventListener("click", start);
   touchPauseButton?.addEventListener("click", startPressed);
+  touchStarPowerButton?.addEventListener("click", activateStarPower);
+  chartUnloadButton.addEventListener("click", unloadCurrentChart);
   stopButton.addEventListener("click", () =>
-    finish("Partie arrêtée — score non enregistré", { stopped: true }),
+    finish("status.stopped", { stopped: true }),
   );
   restartButton.addEventListener("click", start);
   resumeButton.addEventListener("click", resume);
   quitButton.addEventListener("click", () =>
-    finish("Partie arrêtée — score non enregistré", { stopped: true }),
+    finish("status.stopped", { stopped: true }),
   );
   noFailInput.addEventListener("change", saveSettings);
   returnButton?.addEventListener("click", () => {
@@ -1381,7 +1490,7 @@ export function initWebHero(socket = null) {
     gameOverEl.hidden = true;
     stage.classList.remove("is-playing");
     draw(performance.now());
-    statusEl.textContent = "Prêt à jouer.";
+    setStatus("status.ready");
     startButton.focus({ preventScroll: true });
   });
   chartImportButton.addEventListener("click", () => chartFileInput.click());
@@ -1395,7 +1504,9 @@ export function initWebHero(socket = null) {
           await stage.requestFullscreen();
         }
       } catch (error) {
-        statusEl.textContent = `Plein écran indisponible : ${error.message}`;
+        setStatus("status.fullscreenFailed", {
+          error: () => translateError(error),
+        });
       }
     });
   chartSpeedInput.addEventListener("input", () => {
@@ -1428,11 +1539,17 @@ export function initWebHero(socket = null) {
     practiceEndSectionSelect.disabled = !practiceInput.checked || state.running;
     saveSettings();
   });
+  function localizedOption(key, value) {
+    const option = new Option(t(key), value);
+    option.dataset.i18n = key;
+    return option;
+  }
+
   function updatePracticeEndSections() {
     const sections = state.chart?.sections || [];
     const startIndex = Number(practiceStartSectionSelect.value);
     const previousEnd = practiceEndSectionSelect.value;
-    const options = [new Option("Fin de la chart", "-1")];
+    const options = [localizedOption("settings.chartEnd", "-1")];
     sections.forEach((section, index) => {
       if (startIndex < 0 || index >= startIndex)
         options.push(new Option(section.name, String(index)));
@@ -1474,33 +1591,54 @@ export function initWebHero(socket = null) {
         .drawImage(bitmap, 0, 0, imageCanvas.width, imageCanvas.height);
       bitmap.close();
       const image = imageCanvas.toDataURL("image/webp", 0.78);
-      if (image.length > 2_000_000)
-        throw new Error("Image trop volumineuse après compression.");
+      if (image.length > 2_000_000) throw new Error(t("status.imageTooLarge"));
       localStorage.setItem(HIGHWAY_BACKGROUND_KEY, image);
       state.highwayBackground = image;
       backgroundNameOutput.value = file.name;
       backgroundClearButton.disabled = false;
       draw(performance.now());
     } catch (error) {
-      statusEl.textContent = `Image de fond impossible : ${error.message}`;
+      setStatus("status.backgroundFailed", {
+        error: () => translateError(error),
+      });
     } finally {
       highwayBackgroundInput.value = "";
     }
   });
   backgroundClearButton.addEventListener("click", () => {
-    var confirmClear = confirm(
-      "Voulez-vous vraiment supprimer l'image de fond ?",
-    );
+    const confirmClear = confirm(t("custom.removeConfirm"));
     if (!confirmClear) return;
     localStorage.removeItem(HIGHWAY_BACKGROUND_KEY);
     state.highwayBackground = "";
-    backgroundNameOutput.value = "Aucune image";
+    backgroundNameOutput.value = t("custom.noImage");
     backgroundClearButton.disabled = true;
     draw(performance.now());
   });
   function configureLoadedChart(chart) {
+    const availableDifficulties = DIFFICULTY_ORDER.filter(
+      (difficulty) => chart.tracks[difficulty],
+    );
+    const preferredDifficulty = DIFFICULTIES[difficultySelect.value]
+      ? difficultySelect.value
+      : state.difficulty;
+    const selectedDifficulty = availableDifficulties.includes(
+      preferredDifficulty,
+    )
+      ? preferredDifficulty
+      : selectChartTrack(chart, preferredDifficulty, DIFFICULTY_ORDER)
+          .difficulty;
+    difficultySelect.replaceChildren(
+      ...availableDifficulties.map((difficulty) =>
+        localizedOption(`difficulty.${difficulty}`, difficulty),
+      ),
+    );
+    difficultySelect.value = selectedDifficulty;
+    state.difficulty = selectedDifficulty;
+    state.travelTime =
+      DIFFICULTIES[selectedDifficulty].travelTime /
+      Number(hyperspeedInput.value);
     practiceStartSectionSelect.replaceChildren(
-      new Option("Début de la chart", "-1"),
+      localizedOption("settings.chartBeginning", "-1"),
       ...(chart.sections || []).map(
         (section, index) => new Option(section.name, String(index)),
       ),
@@ -1509,6 +1647,61 @@ export function initWebHero(socket = null) {
     updatePracticeEndSections();
     practiceStartSectionSelect.disabled = !practiceInput.checked;
     practiceEndSectionSelect.disabled = !practiceInput.checked;
+  }
+
+  async function unloadCurrentChart() {
+    if (!state.chart || state.running) return;
+    chartUnloadButton.disabled = true;
+    stopSong();
+    audioBuffers = [];
+    state.chart = null;
+    state.chartTitle = "";
+    state.practiceTrack = null;
+    state.practiceRange = null;
+    state.notes = [];
+    state.pendingNotes = [];
+    state.longPauses = [];
+    state.beats = [];
+    state.lyrics = [];
+    state.lyricPhrases = [];
+    state.lyricIndex = -1;
+    state.lyricPhraseIndex = -1;
+    state.lyricActiveIndex = -1;
+    state.starPowerPhrases = [];
+    state.starPowerCharge = 0;
+    state.particles = [];
+    state.fireAt = state.fireAt.map(() => -Infinity);
+    state.totalNotes = 0;
+    state.score = 0;
+    state.combo = 0;
+    state.multiplier = 1;
+    state.maxCombo = 0;
+    savedChartRecord = null;
+    lastChartId = null;
+    storageWarning = "";
+    lyricsEl.replaceChildren();
+    lyricsEl.hidden = true;
+    gameOverEl.hidden = true;
+    pauseEl.hidden = true;
+    importProgress.hidden = true;
+    stage.classList.remove("is-playing");
+    difficultySelect.replaceChildren(localizedOption("difficulty.noChart", ""));
+    difficultySelect.value = "";
+    practiceStartSectionSelect.replaceChildren(
+      localizedOption("settings.chartBeginning", "-1"),
+    );
+    practiceEndSectionSelect.replaceChildren(
+      localizedOption("settings.chartEnd", "-1"),
+    );
+    practiceStartSectionSelect.disabled = true;
+    practiceEndSectionSelect.disabled = true;
+    setChartControlsDisabled(false);
+    startButton.disabled = true;
+    stopButton.hidden = true;
+    const removed = await removeLastChart(localStorage);
+    setStatus(removed ? "status.chartUnloaded" : "status.chartUnloadFailed");
+    draw(performance.now());
+    chartImportButton.focus({ preventScroll: true });
   }
 
   async function restorePreviousChart() {
@@ -1527,17 +1720,24 @@ export function initWebHero(socket = null) {
         difficultySelect.value,
         DIFFICULTY_ORDER,
       );
-      const audioStatus = restored.record.audioFiles.length
+      const audioStatusKey = restored.record.audioFiles.length
         ? restored.record.audioCacheName
-          ? "pistes audio mémorisées"
-          : "audio non mémorisé"
-        : "sans bande-son associée";
-      statusEl.textContent = `${state.chartTitle} restaurée — ${selectedTrack.track.notes.length} notes (${selectedTrack.track.name}), ${audioStatus}.`;
+          ? "status.audioSaved"
+          : "status.audioNotSaved"
+        : "status.noAudioAttached";
+      setStatus("status.chartRestored", {
+        title: state.chartTitle,
+        count: selectedTrack.track.notes.length,
+        track: selectedTrack.track.name,
+        audio: () => t(audioStatusKey),
+      });
     } catch (error) {
       console.error("Impossible de restaurer la dernière chart.", error);
     } finally {
       chartImportButton.disabled = false;
-      startButton.disabled = false;
+      startButton.disabled = !state.chart;
+      difficultySelect.disabled = !state.chart;
+      chartUnloadButton.disabled = !state.chart;
     }
   }
 
@@ -1545,8 +1745,7 @@ export function initWebHero(socket = null) {
     const files = [...chartFileInput.files];
     if (!files.length) return;
     try {
-      if (state.running)
-        throw new Error("Terminez la partie avant d’importer.");
+      if (state.running) throw new Error(t("status.finishPractice"));
       setChartControlsDisabled(true);
       startButton.disabled = true;
       const {
@@ -1557,12 +1756,15 @@ export function initWebHero(socket = null) {
       } = selectChartFolderFiles(files);
       const totalSteps = 1 + audioFiles.length;
       let doneSteps = 0;
-      const progress = (label) => {
+      const progress = (labelKey, values = {}) => {
         importProgress.hidden = false;
         importProgress.value = doneSteps / totalSteps;
-        statusEl.textContent = `${label} — ${Math.round((doneSteps / totalSteps) * 100)} %`;
+        setStatus("status.progress", {
+          label: () => t(labelKey, values),
+          percent: Math.round((doneSteps / totalSteps) * 100),
+        });
       };
-      progress("Lecture de la chart");
+      progress("status.readingChart");
       await new Promise((resolve) => setTimeout(resolve));
       const extension = file.name.split(".").pop().toLowerCase();
       let chart;
@@ -1579,7 +1781,10 @@ export function initWebHero(socket = null) {
       if (audioFiles.length) {
         audioContext ||= new AudioContext();
         for (const [index, audioFile] of audioFiles.entries()) {
-          progress(`Audio ${index + 1}/${audioFiles.length}`);
+          progress("status.audioProgress", {
+            current: index + 1,
+            total: audioFiles.length,
+          });
           decodedAudio.push(
             await audioContext.decodeAudioData(await audioFile.arrayBuffer()),
           );
@@ -1595,7 +1800,7 @@ export function initWebHero(socket = null) {
       lastChartId = null;
       storageWarning = "";
       configureLoadedChart(chart);
-      statusEl.textContent = "Sauvegarde locale de la chart et de l’audio…";
+      setStatus("status.savingChart");
       try {
         const saved = await saveLastChart(localStorage, {
           chart,
@@ -1607,10 +1812,10 @@ export function initWebHero(socket = null) {
         lastChartId = saved.record.id;
         storageWarning =
           saved.record.audioFiles.length && !saved.audioSaved
-            ? " — audio non mémorisé"
+            ? "status.audioWarning"
             : "";
       } catch (error) {
-        storageWarning = " — sauvegarde locale impossible";
+        storageWarning = "status.audioSaveFailed";
         console.error("Impossible de sauvegarder la chart importée.", error);
       }
       const selectedTrack = selectChartTrack(
@@ -1619,18 +1824,27 @@ export function initWebHero(socket = null) {
         DIFFICULTY_ORDER,
       );
       gameOverEl.hidden = true;
-      const audioStatus = audioFiles.length
-        ? `${audioFiles.length} piste${audioFiles.length === 1 ? "" : "s"} audio synchronisée${audioFiles.length === 1 ? "" : "s"}`
-        : "sans bande-son associée";
-      statusEl.textContent = `${songName} chargé — ${selectedTrack.track.notes.length} notes (${selectedTrack.track.name}), ${audioStatus}${storageWarning}.`;
+      setStatus("status.chartImported", {
+        title: songName,
+        count: selectedTrack.track.notes.length,
+        track: selectedTrack.track.name,
+        audio: () =>
+          audioFiles.length
+            ? t("status.audioCount", {
+                count: audioFiles.length,
+                plural: audioFiles.length === 1 ? "" : "s",
+              })
+            : t("status.noAudioAttached"),
+        warning: () => (storageWarning ? t(storageWarning) : ""),
+      });
     } catch (error) {
-      statusEl.textContent = `Import impossible : ${error.message}`;
+      setStatus("status.importFailed", { error: () => translateError(error) });
     } finally {
       chartFileInput.value = "";
       importProgress.hidden = true;
       if (!state.running) {
         setChartControlsDisabled(false);
-        startButton.disabled = false;
+        startButton.disabled = !state.chart;
       }
     }
   });
@@ -1642,7 +1856,7 @@ export function initWebHero(socket = null) {
         DIFFICULTIES[newDifficulty].travelTime / Number(hyperspeedInput.value);
     saveSettings();
     if (!state.running) return;
-    finish("Partie abandonnée : difficulté modifiée", { save: false });
+    finish("status.difficultyChanged", { save: false });
   });
   window.addEventListener("keydown", (event) => {
     if (learnKey(event)) return;
@@ -1652,6 +1866,11 @@ export function initWebHero(socket = null) {
       return;
     }
     if (event.repeat || event.target.matches("input, textarea, select")) return;
+    if (event.code === "Space") {
+      event.preventDefault();
+      activateStarPower();
+      return;
+    }
     if (guitarMode && strumKeys.includes(event.code)) {
       event.preventDefault();
       strum();
@@ -1678,6 +1897,7 @@ export function initWebHero(socket = null) {
   ).map((b) => [].concat(b));
   // Ensembles 5 = pause (Start), 6 et 7 = strum haut/bas (croix directionnelle).
   [[9], [12], [13]].forEach((defaults, i) => (padButtons[5 + i] ??= defaults));
+  padButtons[8] ??= [8];
   const padEls = [...document.querySelectorAll(".web-hero-pad")];
   let padLearn = -1;
   const padDebugEl = document.getElementById("web-hero-pad-debug");
@@ -1740,6 +1960,8 @@ export function initWebHero(socket = null) {
     const isOn = (set, i) =>
       padButtons[i].length > 0 && padButtons[i].every((b) => set.has(b));
     if (padLearn < 0 && isOn(down, 5) && !isOn(padWasDown, 5)) startPressed();
+    if (padLearn < 0 && isOn(down, 8) && !isOn(padWasDown, 8))
+      activateStarPower();
     if (guitarMode && padLearn < 0) {
       for (const i of [6, 7])
         if (isOn(down, i) && !isOn(padWasDown, i)) strum();
@@ -1767,8 +1989,7 @@ export function initWebHero(socket = null) {
   new ResizeObserver(resize).observe(canvas.parentElement);
   resize();
   draw(0);
-  statusEl.textContent =
-    "Importez une chart .chart/.mid, avec ses fichiers audio pour jouer en musique.";
+  setStatus("status.importPrompt");
   void restorePreviousChart();
   if (canvas) canvas.focus();
   /*alert(

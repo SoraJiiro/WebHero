@@ -348,7 +348,6 @@ button:disabled {
 .language-toggle button {
   min-width: 34px;
   min-height: 34px;
-  padding: 0 7px;
   border: 0;
   border-radius: 5px;
   background: transparent;
@@ -807,6 +806,9 @@ button:disabled {
   color: var(--danger);
   font-size: 0.68rem;
 }
+.chart-unload {
+  align-self: flex-start;
+}
 .background-clear i {
   margin-right: 4px;
 }
@@ -844,13 +846,12 @@ button:disabled {
 #web-hero-status {
   display: block;
   min-width: 0;
-  overflow: hidden;
   color: #c2bfae;
   font-size: 0.75rem;
   line-height: 1.4;
   text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 #web-hero-import-progress {
   display: block;
@@ -866,6 +867,9 @@ button:disabled {
   display: none;
 }
 .touch-pause {
+  display: none;
+}
+.touch-starpower {
   display: none;
 }
 .key-row label {
@@ -1137,6 +1141,17 @@ button:disabled {
     color: var(--accent);
     touch-action: manipulation;
   }
+  .touch-starpower {
+    min-width: 48px;
+    min-height: 48px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border-color: #69e5ff;
+    background: #10232a;
+    color: #69e5ff;
+    touch-action: manipulation;
+  }
 
   .is-playing .topbar,
   .is-playing #web-hero-status {
@@ -1176,6 +1191,13 @@ button:disabled {
     position: absolute;
     top: max(12px, env(safe-area-inset-top));
     right: max(12px, env(safe-area-inset-right));
+    display: flex;
+    pointer-events: auto;
+  }
+  .is-playing .touch-starpower {
+    position: absolute;
+    top: max(12px, env(safe-area-inset-top));
+    right: calc(max(12px, env(safe-area-inset-right)) + 70px);
     display: flex;
     pointer-events: auto;
   }

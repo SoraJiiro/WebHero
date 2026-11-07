@@ -142,6 +142,20 @@ export async function restoreLastChart(
   return { record, audioBuffers, audioRestored };
 }
 
+export async function removeLastChart(
+  storage,
+  { cacheStorage = globalThis.caches } = {},
+) {
+  const record = readRecord(storage);
+  try {
+    storage.removeItem(LAST_CHART_KEY);
+  } catch {
+    return false;
+  }
+  await deleteCache(cacheStorage, record?.audioCacheName);
+  return true;
+}
+
 export function markLastChartPlayed(storage, id, playedAt = Date.now()) {
   const record = readRecord(storage);
   if (!record || record.id !== id) return false;

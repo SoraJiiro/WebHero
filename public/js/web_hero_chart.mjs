@@ -100,6 +100,12 @@ export function parseWebHeroChart(text) {
         length: Number(length),
       }),
     );
+    const starPowerPhrases = [
+      ...body.matchAll(/^\s*(\d+)\s*=\s*S\s+2\s+\d+\s+(\d+)\s*$/gm),
+    ].map(([, tick, length]) => ({
+      start: Number(tick),
+      end: Number(tick) + Number(length),
+    }));
     // N 5 = forced (inverse du HOPO naturel), N 6 = tap
     const toggles = new Set(raw.filter((n) => n.lane === 5).map((n) => n.tick));
     const taps = new Set(raw.filter((n) => n.lane === 6).map((n) => n.tick));
@@ -117,6 +123,13 @@ export function parseWebHeroChart(text) {
       if (note.lane === 7) note.lane = 0;
       note.toggle = toggles.has(note.tick);
       note.tap = taps.has(note.tick);
+      const phraseIndex = starPowerPhrases.findIndex(
+        (phrase) => note.tick >= phrase.start && note.tick < phrase.end,
+      );
+      if (phraseIndex >= 0) {
+        note.starPowerPhrase = phraseIndex;
+        note.starPowerPhraseEnd = timeAtTick(starPowerPhrases[phraseIndex].end);
+      }
     }
     classifyNotes(notes, (resolution * 65) / 192);
     tracks[difficulty] = {
@@ -347,6 +360,13 @@ export function parseWebHeroMidi(input) {
       instrument.notes.some(
         (m) => m.pitch === pitch && tick >= m.start && tick < m.end,
       );
+    const starPowerPhrases = instrument.notes
+      .filter((note) => note.pitch === 116)
+      .map((note) => ({
+        start: note.start,
+        end: note.end,
+        endTime: timeAtTick(note.end),
+      }));
     for (const note of instrument.notes) {
       const lane = note.pitch - base;
       if (lane < 0 || lane > 4) continue;
@@ -366,6 +386,14 @@ export function parseWebHeroMidi(input) {
             ? "strum"
             : undefined,
       });
+      const phraseIndex = starPowerPhrases.findIndex(
+        (phrase) => note.start >= phrase.start && note.start < phrase.end,
+      );
+      if (phraseIndex >= 0) {
+        chartNotes.at(-1).starPowerPhrase = phraseIndex;
+        chartNotes.at(-1).starPowerPhraseEnd =
+          starPowerPhrases[phraseIndex].endTime;
+      }
     }
     if (chartNotes.length) {
       chartNotes.sort((a, b) => a.time - b.time || a.lane - b.lane);
@@ -392,16 +420,34 @@ export function parseWebHeroMidi(input) {
 }
 
 export function scheduleWebHeroTrack(track, startAt, travelTime, chartSpeed) {
+  const notes = track.notes.map((note) => ({
+    lane: note.lane,
+    type: note.type,
+    spawnAt: startAt + (note.time / chartSpeed) * 1000 - travelTime,
+    travelTime,
+    sustain: note.sustain / chartSpeed,
+    starPowerPhrase: note.starPowerPhrase,
+    starPowerPhraseEndAt:
+      note.starPowerPhraseEnd === undefined
+        ? undefined
+        : startAt + (note.starPowerPhraseEnd / chartSpeed) * 1000,
+  }));
+  const phrases = new Map();
+  notes.forEach((note) => {
+    if (note.starPowerPhrase === undefined) return;
+    const phrase = phrases.get(note.starPowerPhrase) || {
+      id: note.starPowerPhrase,
+      endAt: note.starPowerPhraseEndAt,
+      noteCount: 0,
+    };
+    phrase.noteCount += 1;
+    phrases.set(note.starPowerPhrase, phrase);
+  });
   return {
     startAt,
     duration: track.duration / chartSpeed,
-    notes: track.notes.map((note) => ({
-      lane: note.lane,
-      type: note.type,
-      spawnAt: startAt + (note.time / chartSpeed) * 1000 - travelTime,
-      travelTime,
-      sustain: note.sustain / chartSpeed,
-    })),
+    notes,
+    starPowerPhrases: [...phrases.values()],
   };
 }
 
