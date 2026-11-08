@@ -34,7 +34,7 @@ const FIRE = {
 const HIT_FLASH_MS = 110;
 const HIGHWAY_IMAGE_SLICES = 32;
 
-export function createGameRenderer({ canvas, state, keys, colors }) {
+export function createGameRenderer({ canvas, state, colors }) {
   const ctx = canvas.getContext("2d");
   const loadImage = (name) => {
     const img = new Image();
@@ -178,7 +178,8 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
     const notesReady = isReady(notesImg);
     const starPowerActive =
       state.running && !state.practiceRange && state.starPowerActiveUntil > now;
-    const spriteWidth = Math.min(laneWidth * 0.7, 80);
+    const noteSize = state.noteSize ?? 1;
+    const spriteWidth = Math.min(laneWidth * 0.7, 80) * noteSize;
 
     if (state.highwayBackground !== highwayImageSource) {
       highwayImageSource = state.highwayBackground;
@@ -435,13 +436,6 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
           ctx.restore();
         }
         drawHitter(lane, flash ? 2 : lit ? 1 : 0, 0, 0, hitterWidth);
-        ctx.fillStyle = "#fff";
-        ctx.shadowColor = "#000";
-        ctx.shadowBlur = 4;
-        ctx.font = `bold ${Math.max(12, hitterWidth * 0.15)}px sans-serif`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(keys[lane].toUpperCase(), 0, 0);
         ctx.restore();
         continue;
       }
@@ -460,11 +454,6 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
       ctx.beginPath();
       ctx.arc(0, 0, targetRadius, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.fillStyle = lit ? "#080808" : colors[lane];
-      ctx.font = `bold ${Math.max(12, Math.min(18, targetRadius * 1.05))}px sans-serif`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(keys[lane].toUpperCase(), 0, 0);
       ctx.restore();
     }
 
@@ -473,7 +462,8 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
       const y = note.hitRegistered ? hitY : progress * hitY;
       const projection = perspectiveAt(y);
       const x = laneCenterAt(note.lane, y);
-      const radius = Math.max(0, Math.min(NOTE_MAX_RADIUS, laneWidth / 2 - 6));
+      const radius =
+        Math.max(0, Math.min(NOTE_MAX_RADIUS, laneWidth / 2 - 6)) * noteSize;
       if (note.sustain > 0) {
         const sustainHeadY = Math.max(topY, y);
         const tailY = Math.max(
@@ -489,7 +479,7 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
         const headProjection = perspectiveAt(sustainHeadY);
         const tailBaseWidth = notesReady
           ? spriteWidth * 0.07
-          : Math.min(NOTE_MAX_RADIUS, laneWidth / 2 - 6) * 0.28;
+          : Math.min(NOTE_MAX_RADIUS, laneWidth / 2 - 6) * noteSize * 0.28;
         const tailHalfWidth = Math.max(2, tailBaseWidth * tailProjection);
         const noteHalfWidth = Math.max(2, tailBaseWidth * headProjection);
         const tailX = laneCenterAt(note.lane, tailY);

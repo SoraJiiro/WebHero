@@ -87,6 +87,9 @@ const messages = {
     "settings.hyperspeed": "Hyperspeed",
     "settings.hyperspeedShort": "Hyper.",
     "settings.hyperspeedAria": "Vitesse de défilement des notes",
+    "settings.noteSize": "Taille des notes",
+    "settings.noteSizeShort": "Notes",
+    "settings.noteSizeTitle": "Régler la taille des notes",
     "settings.noFailTitle":
       "Pas de stage presence ni de game over ; score non enregistré",
     "settings.noFail": "No-Fail Mode",
@@ -298,6 +301,9 @@ const messages = {
     "settings.hyperspeed": "Hyperspeed",
     "settings.hyperspeedShort": "Hyper.",
     "settings.hyperspeedAria": "Note scroll speed",
+    "settings.noteSize": "Note size",
+    "settings.noteSizeShort": "Notes",
+    "settings.noteSizeTitle": "Adjust note size",
     "settings.noFailTitle":
       "No stage presence or game over; score is not submitted",
     "settings.noFail": "No-Fail Mode",

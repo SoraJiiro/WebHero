@@ -78,6 +78,8 @@ export function initWebHero(socket = null) {
   const chartSpeedValue = document.getElementById("web-hero-chart-speed-value");
   const hyperspeedInput = document.getElementById("web-hero-hyperspeed");
   const hyperspeedValue = document.getElementById("web-hero-hyperspeed-value");
+  const noteSizeInput = document.getElementById("web-hero-note-size");
+  const noteSizeValue = document.getElementById("web-hero-note-size-value");
   const audioDelayInput = document.getElementById("web-hero-audio-delay");
   const audioDelayValue = document.getElementById("web-hero-audio-delay-value");
   const videoDelayInput = document.getElementById("web-hero-video-delay");
@@ -116,6 +118,8 @@ export function initWebHero(socket = null) {
     !chartSpeedValue ||
     !hyperspeedInput ||
     !hyperspeedValue ||
+    !noteSizeInput ||
+    !noteSizeValue ||
     !practiceStartSectionSelect ||
     !practiceEndSectionSelect ||
     !primaryColorInput ||
@@ -167,6 +171,7 @@ export function initWebHero(socket = null) {
     pausedAt: 0,
     noFail: false,
     chartSpeed: 1,
+    noteSize: 1,
     audioDelay: 0,
     videoDelay: 0,
     hitZonePreview: false,
@@ -225,7 +230,6 @@ export function initWebHero(socket = null) {
   const { draw, getLaneBounds, getTrackBounds, resize } = createGameRenderer({
     canvas,
     state,
-    keys,
     colors: COLORS,
   });
   let savedSettings = {};
@@ -272,6 +276,7 @@ export function initWebHero(socket = null) {
   for (const [input, value] of [
     [chartSpeedInput, savedSettings.chartSpeed],
     [hyperspeedInput, savedSettings.hyperspeed],
+    [noteSizeInput, savedSettings.noteSize],
     [audioDelayInput, savedSettings.audioDelay],
     [videoDelayInput, savedSettings.videoDelay],
   ]) {
@@ -283,6 +288,8 @@ export function initWebHero(socket = null) {
   }
   chartSpeedValue.value = `${Math.round(Number(chartSpeedInput.value) * 100)} %`;
   hyperspeedValue.value = `${Number(hyperspeedInput.value).toFixed(1)}×`;
+  noteSizeValue.value = `${Math.round(Number(noteSizeInput.value) * 100)} %`;
+  state.noteSize = Number(noteSizeInput.value);
   audioDelayValue.value = `${audioDelayInput.value} ms`;
   videoDelayValue.value = `${videoDelayInput.value} ms`;
   state.audioDelay = Number(audioDelayInput.value);
@@ -302,6 +309,7 @@ export function initWebHero(socket = null) {
           difficulty: state.difficulty,
           chartSpeed: Number(chartSpeedInput.value),
           hyperspeed: Number(hyperspeedInput.value),
+          noteSize: state.noteSize,
           audioDelay: Number(audioDelayInput.value),
           videoDelay: Number(videoDelayInput.value),
           noFail: noFailInput.checked,
@@ -325,6 +333,7 @@ export function initWebHero(socket = null) {
     chartUnloadButton.disabled = disabled || !state.chart;
     chartSpeedInput.disabled = disabled;
     hyperspeedInput.disabled = disabled;
+    noteSizeInput.disabled = disabled;
     audioDelayInput.disabled = disabled;
     videoDelayInput.disabled = disabled;
     noFailInput.disabled = disabled;
@@ -1613,6 +1622,12 @@ export function initWebHero(socket = null) {
       state.travelTime =
         DIFFICULTIES[difficultySelect.value].travelTime /
         Number(hyperspeedInput.value);
+    saveSettings();
+    draw(performance.now());
+  });
+  noteSizeInput.addEventListener("input", () => {
+    state.noteSize = Number(noteSizeInput.value);
+    noteSizeValue.value = `${Math.round(state.noteSize * 100)} %`;
     saveSettings();
     draw(performance.now());
   });
