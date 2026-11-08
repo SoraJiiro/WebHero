@@ -11,7 +11,6 @@ const SPRITE_COL = [1, 4, 2, 0, 3];
 const SPRITE_PITCH = { x: 100, y: 500 / 6 };
 const SPRITE_ART = { dx: 1, dy: 1, w: 98, h: 500 / 6 - 2 };
 const STAR_POWER_COL = { strum: 0, hopo: 1, tap: 2 };
-const STAR_POWER_ROW = 3;
 const STAR_POWER_ACTIVE_ROW = 5;
 
 const HITTER = {
@@ -505,8 +504,6 @@ export function createGameRenderer({ canvas, state, colors }) {
         const noteHeight = (spriteWidth * SPRITE_ART.h) / SPRITE_ART.w;
         if (state.practiceRange || note.starPowerPhrase === undefined)
           drawSprite(note.lane, row, x, y, noteWidth, noteHeight);
-        else if (!starPowerActive)
-          drawSprite(note.lane, STAR_POWER_ROW, x, y, noteWidth, noteHeight);
         else drawStarPowerSprite(note.type, x, y, noteWidth, noteHeight);
         ctx.globalAlpha = 1;
         return;
