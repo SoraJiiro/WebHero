@@ -154,6 +154,14 @@
                   class="fa-solid fa-play"
                   aria-hidden="true"></i>
               </button>
+              <button id="web-hero-practice-restart" class="result-return"
+                type="button" hidden
+                title="Recommencer avec Espace ou le bouton Star Power"
+                data-i18n-attrs="title:pause.restartSectionTitle">
+                <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+                <span data-i18n="pause.restartSection">Recommencer la
+                  section</span>
+              </button>
               <button id="web-hero-quit" class="result-return" type="button"
                 aria-label="Abandonner la partie"
                 data-i18n-attrs="aria-label:pause.quitAria">
@@ -493,6 +501,13 @@
                   aria-label="Touche de strum bas"
                   title="Cliquer puis appuyer sur une touche"
                   data-i18n-attrs="aria-label:keyboard.strumDown;title:keyboard.learnTitle"></button></label>
+              <label class="pause-map" title="Touche Star Power"
+                data-i18n-attrs="title:keyboard.starPower"><i
+                  class="fa-solid fa-star" aria-hidden="true"></i><button
+                  id="web-hero-star-power-key" type="button"
+                  aria-label="Touche Star Power"
+                  title="Cliquer puis appuyer sur une touche"
+                  data-i18n-attrs="aria-label:keyboard.starPower;title:keyboard.learnTitle"></button></label>
             </div>
           </section>
           <section class="settings-panel" role="group"
@@ -533,27 +548,6 @@
         </div>
         <div class="touch-controls" role="group" aria-label="Touches tactiles"
           data-i18n-attrs="aria-label:touch.group">
-          <button class="touch-lane lane-0" type="button"
-            aria-label="Jouer la lane rouge" title="Activer la lane rouge"
-            data-i18n-attrs="aria-label:touch.laneRed;title:touch.activateLaneRed"><span
-              aria-hidden="true">●</span></button>
-          <button class="touch-lane lane-1" type="button"
-            aria-label="Jouer la lane orange"
-            title="Activer la lane orange"
-            data-i18n-attrs="aria-label:touch.laneOrange;title:touch.activateLaneOrange"><span
-              aria-hidden="true">●</span></button>
-          <button class="touch-lane lane-2" type="button"
-            aria-label="Jouer la lane jaune" title="Activer la lane jaune"
-            data-i18n-attrs="aria-label:touch.laneYellow;title:touch.activateLaneYellow"><span
-              aria-hidden="true">●</span></button>
-          <button class="touch-lane lane-3" type="button"
-            aria-label="Jouer la lane verte" title="Activer la lane verte"
-            data-i18n-attrs="aria-label:touch.laneGreen;title:touch.activateLaneGreen"><span
-              aria-hidden="true">●</span></button>
-          <button class="touch-lane lane-4" type="button"
-            aria-label="Jouer la lane bleue" title="Activer la lane bleue"
-            data-i18n-attrs="aria-label:touch.laneBlue;title:touch.activateLaneBlue"><span
-              aria-hidden="true">●</span></button>
           <button id="web-hero-touch-pause" class="touch-pause" type="button"
             aria-label="Mettre le jeu en pause"
             data-i18n-attrs="aria-label:touch.pause"><i

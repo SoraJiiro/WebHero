@@ -149,6 +149,9 @@ export function initWebHero(socket = null) {
   const lyricsEl = document.getElementById("web-hero-lyrics");
   const pauseEl = document.getElementById("web-hero-pause");
   const resumeButton = document.getElementById("web-hero-resume");
+  const practiceRestartButton = document.getElementById(
+    "web-hero-practice-restart",
+  );
   const quitButton = document.getElementById("web-hero-quit");
   const noFailInput = document.getElementById("web-hero-nofail");
   document.addEventListener("webhero:languagechange", () =>
@@ -335,6 +338,8 @@ export function initWebHero(socket = null) {
   let guitarMode = false;
   let pauseKey = localStorage.getItem("web-hero-pause-key") || "Escape";
   let pauseKeyLearn = false;
+  let starPowerKey = localStorage.getItem("web-hero-star-power-key") || "Space";
+  let starPowerKeyLearn = false;
   const keyLabel = (code) =>
     ({ ArrowUp: "↑", ArrowDown: "↓", ArrowLeft: "←", ArrowRight: "→" })[code] ??
     code.replace(/^(Key|Digit)/, "");
@@ -344,6 +349,14 @@ export function initWebHero(socket = null) {
   pauseKeyEl.addEventListener("click", () => {
     pauseKeyLearn = true;
     pauseKeyEl.textContent = "…";
+  });
+  const starPowerKeyEl = document.getElementById("web-hero-star-power-key");
+  const showStarPowerKey = () =>
+    (starPowerKeyEl.textContent = keyLabel(starPowerKey));
+  showStarPowerKey();
+  starPowerKeyEl.addEventListener("click", () => {
+    starPowerKeyLearn = true;
+    starPowerKeyEl.textContent = "…";
   });
   let strumKeys = JSON.parse(
     localStorage.getItem("web-hero-strum-keys") || '["ArrowUp","ArrowDown"]',
@@ -371,20 +384,39 @@ export function initWebHero(socket = null) {
   });
   // Retourne true si l'événement a servi à assigner (ou annuler) une touche.
   function learnKey(event) {
+    if (starPowerKeyLearn) {
+      event.preventDefault();
+      if (
+        event.code !== pauseKey &&
+        !strumKeys.includes(event.code) &&
+        !keys.includes(event.key.toLowerCase()) &&
+        !["Shift", "Control", "Alt", "Meta"].includes(event.key)
+      ) {
+        starPowerKey = event.code;
+        localStorage.setItem("web-hero-star-power-key", starPowerKey);
+      }
+      starPowerKeyLearn = false;
+      showStarPowerKey();
+      return true;
+    }
     if (pauseKeyLearn) {
       event.preventDefault();
-      pauseKey = event.code;
+      if (event.code !== starPowerKey) {
+        pauseKey = event.code;
+        localStorage.setItem("web-hero-pause-key", pauseKey);
+      }
       pauseKeyLearn = false;
-      localStorage.setItem("web-hero-pause-key", pauseKey);
       showPauseKey();
       return true;
     }
     if (strumKeyLearn >= 0) {
       event.preventDefault();
       const i = strumKeyLearn;
-      strumKeys[i] = event.code;
+      if (event.code !== starPowerKey) {
+        strumKeys[i] = event.code;
+        localStorage.setItem("web-hero-strum-keys", JSON.stringify(strumKeys));
+      }
       strumKeyLearn = -1;
-      localStorage.setItem("web-hero-strum-keys", JSON.stringify(strumKeys));
       showStrumKey(i);
       return true;
     }
@@ -403,7 +435,7 @@ export function initWebHero(socket = null) {
       }
       return true;
     }
-    if (!keys.includes(value)) {
+    if (!keys.includes(value) && event.code !== starPowerKey) {
       keys[lane] = value;
       localStorage.setItem("web-hero-keys", JSON.stringify(keys));
     }
@@ -422,15 +454,8 @@ export function initWebHero(socket = null) {
     );
     if (phraseIndex !== state.lyricPhraseIndex) {
       const phrase = state.lyricPhrases[phraseIndex];
-      lyricsEl.replaceChildren();
-      lyricSpans = phrase.syllables.map((syllable) => {
-        if (syllable.separatorBefore)
-          lyricsEl.append(document.createTextNode(syllable.separatorBefore));
-        const span = document.createElement("span");
-        span.textContent = syllable.text;
-        lyricsEl.append(span);
-        return span;
-      });
+      lyricSpans = formatLyricPhrase(phrase.syllables);
+      lyricsEl.replaceChildren(...lyricSpans);
       state.lyricPhraseIndex = phraseIndex;
       state.lyricActiveIndex = -1;
     }
@@ -442,6 +467,86 @@ export function initWebHero(socket = null) {
       );
       state.lyricActiveIndex = activeIndex;
     }
+  }
+
+  function formatLyricPhrase(syllables) {
+    const spans = syllables.map(() => document.createElement("span"));
+    let prefix = "\uE000";
+    while (syllables.some((syllable) => syllable.text.includes(prefix)))
+      prefix += "\uE000";
+    const marker = new RegExp(`${prefix}(\\d+)\uE001`, "g");
+    const template = document.createElement("template");
+    template.innerHTML = syllables
+      .map(
+        (syllable, index) =>
+          `${prefix}${index}\uE001${syllable.separatorBefore}${syllable.text}`,
+      )
+      .join("");
+    const allowed = new Set([
+      "B",
+      "STRONG",
+      "I",
+      "EM",
+      "U",
+      "S",
+      "DEL",
+      "SUB",
+      "SUP",
+      "BR",
+    ]);
+    const blocked = new Set([
+      "SCRIPT",
+      "STYLE",
+      "TEMPLATE",
+      "IFRAME",
+      "OBJECT",
+      "SVG",
+      "MATH",
+    ]);
+    let currentIndex = -1;
+
+    function append(node, tags) {
+      if (currentIndex < 0 || currentIndex >= spans.length) return;
+      let target = spans[currentIndex];
+      for (const tag of tags) {
+        const element = document.createElement(tag);
+        target.append(element);
+        target = element;
+      }
+      target.append(node);
+    }
+
+    function visit(node, tags = []) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        let lastIndex = 0;
+        marker.lastIndex = 0;
+        for (const match of node.data.matchAll(marker)) {
+          if (match.index > lastIndex)
+            append(
+              document.createTextNode(node.data.slice(lastIndex, match.index)),
+              tags,
+            );
+          currentIndex = Number(match[1]);
+          lastIndex = match.index + match[0].length;
+        }
+        if (lastIndex < node.data.length)
+          append(document.createTextNode(node.data.slice(lastIndex)), tags);
+        return;
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE || blocked.has(node.tagName))
+        return;
+      if (node.tagName === "BR") {
+        append(document.createElement("br"), tags);
+        return;
+      }
+      const childTags = allowed.has(node.tagName)
+        ? [...tags, node.localName]
+        : tags;
+      node.childNodes.forEach((child) => visit(child, childTags));
+    }
+
+    template.content.childNodes.forEach((node) => visit(node));
+    return spans;
   }
 
   function frame(now) {
@@ -761,6 +866,7 @@ export function initWebHero(socket = null) {
       if (note.holding) endSustain(note, state.pausedAt);
     }
     stopSong();
+    practiceRestartButton.hidden = !state.practiceRange;
     pauseEl.hidden = false;
     resumeButton.focus();
   }
@@ -860,7 +966,13 @@ export function initWebHero(socket = null) {
       state.chartSpeed,
     );
     state.notes = [];
-    state.pendingNotes = schedule.notes;
+    state.pendingNotes = state.practiceRange
+      ? schedule.notes.map((note) => ({
+          ...note,
+          starPowerPhrase: undefined,
+          starPowerPhraseEndAt: undefined,
+        }))
+      : schedule.notes;
     state.lyrics = scheduleWebHeroLyrics(
       (state.chart.lyrics || [])
         .filter(
@@ -898,7 +1010,9 @@ export function initWebHero(socket = null) {
       state.chartSpeed,
     );
     state.chartDuration = schedule.duration;
-    state.starPowerPhrases = schedule.starPowerPhrases;
+    state.starPowerPhrases = state.practiceRange
+      ? []
+      : schedule.starPowerPhrases;
     state.startedAt = schedule.startAt;
     return schedule;
   }
@@ -937,6 +1051,24 @@ export function initWebHero(socket = null) {
       );
     }
     state.lastFrame = schedule.startAt;
+  }
+
+  function restartPractice() {
+    if (!state.running || !state.practiceRange || state.ending) return;
+    cancelAnimationFrame(state.animation);
+    clearHeldKeys();
+    state.paused = false;
+    pauseEl.hidden = true;
+    const now = performance.now();
+    repeatPractice(now);
+    canvas.focus({ preventScroll: true });
+    draw(now + state.videoDelay);
+    state.animation = requestAnimationFrame(frame);
+  }
+
+  function starPowerOrRestart() {
+    if (state.practiceRange && state.running) restartPractice();
+    else activateStarPower();
   }
 
   function resume() {
@@ -1031,6 +1163,17 @@ export function initWebHero(socket = null) {
       ? getPracticeSegment(chartTrack)
       : null;
     state.practiceTrack = state.practiceRange?.track || chartTrack;
+    if (touchStarPowerButton) {
+      const actionKey = state.practiceRange
+        ? "pause.restartSection"
+        : "touch.starPower";
+      touchStarPowerButton.dataset.i18nAttrs = `aria-label:${actionKey};title:${actionKey}`;
+      touchStarPowerButton.setAttribute("aria-label", t(actionKey));
+      touchStarPowerButton.title = t(actionKey);
+      const icon = touchStarPowerButton.querySelector("i");
+      icon?.classList.toggle("fa-star", !state.practiceRange);
+      icon?.classList.toggle("fa-rotate-left", !!state.practiceRange);
+    }
     const audioStartAt = audioBuffers.length
       ? audioContext.currentTime + Math.max(0, travelTime + audioDelay) / 1000
       : null;
@@ -1129,7 +1272,7 @@ export function initWebHero(socket = null) {
   }
 
   function getStarPowerFactor(now) {
-    return state.starPowerActiveUntil > now ? 2 : 1;
+    return !state.practiceRange && state.starPowerActiveUntil > now ? 2 : 1;
   }
 
   function settleStarPowerPhrases(now) {
@@ -1316,9 +1459,6 @@ export function initWebHero(socket = null) {
   const heldKeyboardLanes = new Map();
   const heldTouchPointers = new Map();
   const heldTouchLanes = new Map();
-  const heldCanvasPointers = new Set();
-  const touchLaneButtons = [...document.querySelectorAll(".touch-lane")];
-  const touchControls = document.querySelector(".touch-controls");
   const autoHitLanes = new Set();
   function getHeldLanes() {
     return [...heldKeyboardLanes.values(), ...heldTouchLanes.keys()];
@@ -1336,10 +1476,6 @@ export function initWebHero(socket = null) {
     heldKeyboardLanes.clear();
     heldTouchPointers.clear();
     heldTouchLanes.clear();
-    heldCanvasPointers.clear();
-    touchLaneButtons.forEach((button) => {
-      button.classList.remove("is-pressed");
-    });
     for (const lane of autoHitLanes) {
       if (!getHeldLanes().includes(lane)) autoHitLanes.delete(lane);
     }
@@ -1354,7 +1490,6 @@ export function initWebHero(socket = null) {
       pointers.delete(pointerId);
       if (pointers.size === 0) {
         heldTouchLanes.delete(previousLane);
-        touchLaneButtons[previousLane].classList.remove("is-pressed");
         release(keys[previousLane]);
         if (!getHeldLanes().includes(previousLane))
           autoHitLanes.delete(previousLane);
@@ -1363,57 +1498,16 @@ export function initWebHero(socket = null) {
     heldTouchPointers.set(pointerId, lane);
     if (lane === null) return;
     const pointers = heldTouchLanes.get(lane) || new Set();
-    if (pointers.size === 0) pressLane(lane);
+    if (pointers.size === 0) hit(lane);
     pointers.add(pointerId);
     heldTouchLanes.set(lane, pointers);
-    touchLaneButtons[lane].classList.add("is-pressed");
   }
 
   function finishTouchPointer(pointerId) {
     if (!heldTouchPointers.has(pointerId)) return;
     setTouchPointerLane(pointerId, null);
     heldTouchPointers.delete(pointerId);
-    heldCanvasPointers.delete(pointerId);
   }
-
-  touchControls?.addEventListener("pointermove", (event) => {
-    if (
-      !heldTouchPointers.has(event.pointerId) ||
-      heldCanvasPointers.has(event.pointerId)
-    )
-      return;
-    const target = document
-      .elementFromPoint(event.clientX, event.clientY)
-      ?.closest(".touch-lane");
-    const lane = touchLaneButtons.indexOf(target);
-    event.preventDefault();
-    setTouchPointerLane(event.pointerId, lane < 0 ? null : lane);
-  });
-
-  touchLaneButtons.forEach((button, lane) => {
-    button.addEventListener("pointerdown", (event) => {
-      event.preventDefault();
-      if (event.button !== 0) return;
-      if (heldTouchPointers.has(event.pointerId)) return;
-      heldTouchPointers.set(event.pointerId, null);
-      setTouchPointerLane(event.pointerId, lane);
-      button.setPointerCapture(event.pointerId);
-    });
-    button.addEventListener("pointerup", (event) =>
-      finishTouchPointer(event.pointerId),
-    );
-    button.addEventListener("pointercancel", (event) =>
-      finishTouchPointer(event.pointerId),
-    );
-    button.addEventListener("lostpointercapture", (event) =>
-      finishTouchPointer(event.pointerId),
-    );
-    button.addEventListener("click", (event) => {
-      if (event.detail !== 0) return;
-      pressLane(lane);
-      release(keys[lane]);
-    });
-  });
   function getCanvasTouchLane(event) {
     const rect = canvas.getBoundingClientRect();
     if (!rect.width || !rect.height) return null;
@@ -1429,7 +1523,7 @@ export function initWebHero(socket = null) {
     return x >= track.x &&
       x < track.x + track.width &&
       lane >= 0 &&
-      lane < touchLaneButtons.length &&
+      lane < keys.length &&
       Math.abs(y - (state.viewHeight - HIT_ZONE_OFFSET)) <= touchRadius
       ? lane
       : null;
@@ -1441,12 +1535,11 @@ export function initWebHero(socket = null) {
     if (lane === null || heldTouchPointers.has(event.pointerId)) return;
     event.preventDefault();
     heldTouchPointers.set(event.pointerId, null);
-    heldCanvasPointers.add(event.pointerId);
     setTouchPointerLane(event.pointerId, lane);
     canvas.setPointerCapture(event.pointerId);
   });
   canvas.addEventListener("pointermove", (event) => {
-    if (!heldCanvasPointers.has(event.pointerId)) return;
+    if (!heldTouchPointers.has(event.pointerId)) return;
     event.preventDefault();
     setTouchPointerLane(event.pointerId, getCanvasTouchLane(event));
   });
@@ -1462,13 +1555,14 @@ export function initWebHero(socket = null) {
 
   startButton.addEventListener("click", start);
   touchPauseButton?.addEventListener("click", startPressed);
-  touchStarPowerButton?.addEventListener("click", activateStarPower);
+  touchStarPowerButton?.addEventListener("click", starPowerOrRestart);
   chartUnloadButton.addEventListener("click", unloadCurrentChart);
   stopButton.addEventListener("click", () =>
     finish("status.stopped", { stopped: true }),
   );
   restartButton.addEventListener("click", start);
   resumeButton.addEventListener("click", resume);
+  practiceRestartButton.addEventListener("click", restartPractice);
   quitButton.addEventListener("click", () =>
     finish("status.stopped", { stopped: true }),
   );
@@ -1866,9 +1960,9 @@ export function initWebHero(socket = null) {
       return;
     }
     if (event.repeat || event.target.matches("input, textarea, select")) return;
-    if (event.code === "Space") {
+    if (event.code === starPowerKey) {
       event.preventDefault();
-      activateStarPower();
+      starPowerOrRestart();
       return;
     }
     if (guitarMode && strumKeys.includes(event.code)) {
@@ -1961,7 +2055,7 @@ export function initWebHero(socket = null) {
       padButtons[i].length > 0 && padButtons[i].every((b) => set.has(b));
     if (padLearn < 0 && isOn(down, 5) && !isOn(padWasDown, 5)) startPressed();
     if (padLearn < 0 && isOn(down, 8) && !isOn(padWasDown, 8))
-      activateStarPower();
+      starPowerOrRestart();
     if (guitarMode && padLearn < 0) {
       for (const i of [6, 7])
         if (isOn(down, i) && !isOn(padWasDown, i)) strum();

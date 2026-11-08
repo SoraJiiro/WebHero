@@ -39,8 +39,15 @@ export function scheduleWebHeroBeats(beats, startAt, chartSpeed) {
 
 export function cleanLyric(text) {
   return text
-    .replace(/[#^*%$§+/]/g, "")
-    .replace(/=/g, "-")
+    .split(
+      /(<\/?[a-z](?:[^>'"]|"[^"]*"|'[^']*')*>|&(?:#(?:x[\da-f]+|\d+)|[a-z][\da-z]+);)/gi,
+    )
+    .map((part, index) =>
+      index % 2 === 0
+        ? part.replace(/[#^*%$§+/]/g, "").replace(/=/g, "-")
+        : part,
+    )
+    .join("")
     .trim();
 }
 
@@ -512,10 +519,12 @@ export function groupWebHeroLyrics(lyrics) {
   let phrase;
   for (const [index, lyric] of lyrics.entries()) {
     const previous = lyrics[index - 1];
+    const previousText =
+      previous?.text.replace(/(?:<\/[a-z][\w:-]*\s*>\s*)+$/i, "") || "";
     if (
       !phrase ||
       lyric.at - previous.at > 1_250 ||
-      /[.!?,;:]$/.test(previous.text)
+      /[.!?,;:]$/.test(previousText)
     ) {
       phrase = {
         startIndex: index,
@@ -526,9 +535,9 @@ export function groupWebHeroLyrics(lyrics) {
     const previousSyllable = phrase.syllables.at(-1);
     phrase.syllables.push({
       at: lyric.at,
-      text: lyric.text.replace(/-$/, ""),
+      text: lyric.text.replace(/-(?=(?:<\/[a-z][\w:-]*\s*>\s*)*$)/i, ""),
       separatorBefore:
-        previousSyllable && !previous.text.endsWith("-") ? " " : "",
+        previousSyllable && !previousText.endsWith("-") ? " " : "",
     });
   }
   phrases.forEach((item) => {

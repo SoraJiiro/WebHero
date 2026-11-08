@@ -8,8 +8,11 @@ export const NOTE_MAX_RADIUS = 26;
 
 // Feuille de sprites : colonnes vert/rouge/jaune/bleu/orange ; lignes 0 note, 1 lumineuse, 2 vitre.
 const SPRITE_COL = [1, 4, 2, 0, 3];
-const SPRITE_PITCH = { x: 290.4, y: 219 };
-const SPRITE_ART = { dx: 8, dy: 20, w: 278, h: 190 };
+const SPRITE_PITCH = { x: 100, y: 500 / 6 };
+const SPRITE_ART = { dx: 1, dy: 1, w: 98, h: 500 / 6 - 2 };
+const STAR_POWER_COL = { strum: 0, hopo: 1, tap: 2 };
+const STAR_POWER_ROW = 3;
+const STAR_POWER_ACTIVE_ROW = 5;
 
 const HITTER = {
   columnX: [338.75, 1215, 628, 30, 921.75],
@@ -82,12 +85,25 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
       height,
     );
   }
-  function drawSprite(lane, row, cx, cy, width) {
-    const height = (width * SPRITE_ART.h) / SPRITE_ART.w;
+  function drawSprite(lane, row, cx, cy, width, height) {
     ctx.drawImage(
       notesImg,
       SPRITE_COL[lane] * SPRITE_PITCH.x + SPRITE_ART.dx,
       row * SPRITE_PITCH.y + SPRITE_ART.dy,
+      SPRITE_ART.w,
+      SPRITE_ART.h,
+      cx - width / 2,
+      cy - height / 2,
+      width,
+      height,
+    );
+    return height;
+  }
+  function drawStarPowerSprite(type, cx, cy, width, height) {
+    ctx.drawImage(
+      notesImg,
+      (STAR_POWER_COL[type] ?? 0) * SPRITE_PITCH.x + SPRITE_ART.dx,
+      STAR_POWER_ACTIVE_ROW * SPRITE_PITCH.y + SPRITE_ART.dy,
       SPRITE_ART.w,
       SPRITE_ART.h,
       cx - width / 2,
@@ -153,13 +169,15 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
     const topY = Math.max(0, height * 0.05);
     const topScale = 0.82;
     const perspectiveAt = (y) =>
-      topScale + (1 - topScale) * Math.max(0, Math.min(1, y / hitY));
+      Math.max(0.01, topScale + (1 - topScale) * (y / Math.max(1, hitY)));
     const laneCenterAt = (lane, y) =>
       width / 2 +
       (trackX + (lane + 0.5) * laneWidth - width / 2) * perspectiveAt(y);
     const trackEdgeAt = (edge, y) =>
       width / 2 + (edge - width / 2) * perspectiveAt(y);
     const notesReady = isReady(notesImg);
+    const starPowerActive =
+      state.running && !state.practiceRange && state.starPowerActiveUntil > now;
     const spriteWidth = Math.min(laneWidth * 0.7, 80);
 
     if (state.highwayBackground !== highwayImageSource) {
@@ -176,8 +194,8 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
     ctx.beginPath();
     ctx.moveTo(trackEdgeAt(trackX, topY), topY);
     ctx.lineTo(trackEdgeAt(trackX + trackWidth, topY), topY);
-    ctx.lineTo(trackX + trackWidth, height);
-    ctx.lineTo(trackX, height);
+    ctx.lineTo(trackEdgeAt(trackX + trackWidth, height), height);
+    ctx.lineTo(trackEdgeAt(trackX, height), height);
     ctx.closePath();
     ctx.fill();
     if (isReady(highwayImage)) {
@@ -191,8 +209,8 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
       ctx.beginPath();
       ctx.moveTo(trackEdgeAt(trackX, topY), topY);
       ctx.lineTo(trackEdgeAt(trackX + trackWidth, topY), topY);
-      ctx.lineTo(trackX + trackWidth, height);
-      ctx.lineTo(trackX, height);
+      ctx.lineTo(trackEdgeAt(trackX + trackWidth, height), height);
+      ctx.lineTo(trackEdgeAt(trackX, height), height);
       ctx.closePath();
       ctx.clip();
       ctx.globalAlpha = 0.48;
@@ -215,9 +233,6 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
           highwayImage.naturalHeight / HIGHWAY_IMAGE_SLICES;
         const sliceHeight = imageHeight / HIGHWAY_IMAGE_SLICES;
         for (let slice = 0; slice < HIGHWAY_IMAGE_SLICES; slice++) {
-          const sourceSlice = mirrored
-            ? HIGHWAY_IMAGE_SLICES - slice - 1
-            : slice;
           const sliceY = imageY + slice * sliceHeight;
           const slicePerspective = perspectiveAt(sliceY + sliceHeight / 2);
           ctx.save();
@@ -225,13 +240,13 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
           ctx.scale(slicePerspective, 1);
           ctx.translate(-width / 2, 0);
           if (mirrored) {
-            ctx.translate(0, sliceY + sliceHeight);
-            ctx.scale(1, -1);
+            ctx.translate(width, 0);
+            ctx.scale(-1, 1);
           }
           ctx.drawImage(
             highwayImage,
             0,
-            sourceSlice * sourceSliceHeight,
+            slice * sourceSliceHeight,
             highwayImage.naturalWidth,
             sourceSliceHeight,
             imageX,
@@ -244,6 +259,23 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
       }
       ctx.restore();
     }
+    if (starPowerActive) {
+      const pulse = 0.13 + (Math.sin(now / 260) + 1) * 0.035;
+      const tint = ctx.createLinearGradient(0, topY, 0, height);
+      tint.addColorStop(0, `rgba(24,125,255,${pulse * 0.45})`);
+      tint.addColorStop(1, `rgba(16,115,255,${pulse})`);
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(trackEdgeAt(trackX, topY), topY);
+      ctx.lineTo(trackEdgeAt(trackX + trackWidth, topY), topY);
+      ctx.lineTo(trackEdgeAt(trackX + trackWidth, height), height);
+      ctx.lineTo(trackEdgeAt(trackX, height), height);
+      ctx.closePath();
+      ctx.clip();
+      ctx.fillStyle = tint;
+      ctx.fillRect(0, topY, width, height - topY);
+      ctx.restore();
+    }
     const fadeHeight = (height - topY) * 0.3;
     const laneLine = ctx.createLinearGradient(0, topY, 0, topY + fadeHeight);
     laneLine.addColorStop(0, "rgba(255,255,255,0)");
@@ -251,8 +283,8 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
     for (let lane = 0; lane < 5; lane++) {
       const leftTop = trackEdgeAt(trackX + lane * laneWidth, topY);
       const rightTop = trackEdgeAt(trackX + (lane + 1) * laneWidth, topY);
-      const leftBottom = trackX + lane * laneWidth;
-      const rightBottom = trackX + (lane + 1) * laneWidth;
+      const leftBottom = trackEdgeAt(trackX + lane * laneWidth, height);
+      const rightBottom = trackEdgeAt(trackX + (lane + 1) * laneWidth, height);
       ctx.fillStyle =
         lane % 2 ? "rgba(255,255,255,.035)" : "rgba(255,255,255,.07)";
       ctx.beginPath();
@@ -270,16 +302,13 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
       ctx.stroke();
     }
     const laneDividerStartY = height - (height - topY) * 0.35;
-    const laneDividerProgress =
-      (laneDividerStartY - topY) / Math.max(1, height - topY);
     ctx.strokeStyle = "rgba(255,255,255,.2)";
     ctx.lineWidth = 2;
     for (let lane = 1; lane < 5; lane++) {
       const x = trackX + lane * laneWidth;
-      const topX = trackEdgeAt(x, topY);
       ctx.beginPath();
-      ctx.moveTo(topX + (x - topX) * laneDividerProgress, laneDividerStartY);
-      ctx.lineTo(x, height);
+      ctx.moveTo(trackEdgeAt(x, laneDividerStartY), laneDividerStartY);
+      ctx.lineTo(trackEdgeAt(x, height), height);
       ctx.stroke();
     }
     // Bordures latérales seulement, pas de bord supérieur.
@@ -287,9 +316,9 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(trackEdgeAt(trackX, topY), topY);
-    ctx.lineTo(trackX, height);
+    ctx.lineTo(trackEdgeAt(trackX, height), height);
     ctx.moveTo(trackEdgeAt(trackX + trackWidth, topY), topY);
-    ctx.lineTo(trackX + trackWidth, height);
+    ctx.lineTo(trackEdgeAt(trackX + trackWidth, height), height);
     ctx.stroke();
 
     if (state.running) {
@@ -444,10 +473,7 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
       const y = note.hitRegistered ? hitY : progress * hitY;
       const projection = perspectiveAt(y);
       const x = laneCenterAt(note.lane, y);
-      const radius = Math.max(
-        0,
-        Math.min(NOTE_MAX_RADIUS, laneWidth / 2 - 6) * projection,
-      );
+      const radius = Math.max(0, Math.min(NOTE_MAX_RADIUS, laneWidth / 2 - 6));
       if (note.sustain > 0) {
         const sustainHeadY = Math.max(topY, y);
         const tailY = Math.max(
@@ -485,17 +511,26 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
       if (note.missed) ctx.globalAlpha = 0.3;
       if (notesReady) {
         const row = note.type === "tap" ? 2 : note.type === "hopo" ? 1 : 0;
-        drawSprite(note.lane, row, x, y, spriteWidth * projection);
+        const noteWidth = spriteWidth * projection;
+        const noteHeight = (spriteWidth * SPRITE_ART.h) / SPRITE_ART.w;
+        if (state.practiceRange || note.starPowerPhrase === undefined)
+          drawSprite(note.lane, row, x, y, noteWidth, noteHeight);
+        else if (!starPowerActive)
+          drawSprite(note.lane, STAR_POWER_ROW, x, y, noteWidth, noteHeight);
+        else drawStarPowerSprite(note.type, x, y, noteWidth, noteHeight);
         ctx.globalAlpha = 1;
         return;
       }
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(projection, 1);
       ctx.beginPath();
-      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.arc(0, 0, radius, 0, Math.PI * 2);
       ctx.fill();
       if (note.type === "hopo") {
         ctx.fillStyle = "#fff";
         ctx.beginPath();
-        ctx.arc(x, y, radius * 0.5, 0, Math.PI * 2);
+        ctx.arc(0, 0, radius * 0.5, 0, Math.PI * 2);
         ctx.fill();
       } else if (note.type === "tap") {
         ctx.strokeStyle = "#fff";
@@ -503,9 +538,10 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
         ctx.stroke();
         ctx.fillStyle = "#080808";
         ctx.beginPath();
-        ctx.arc(x, y, radius * 0.45, 0, Math.PI * 2);
+        ctx.arc(0, 0, radius * 0.45, 0, Math.PI * 2);
         ctx.fill();
       }
+      ctx.restore();
       ctx.globalAlpha = 1;
     });
     if (isReady(fireImg)) {
@@ -528,7 +564,7 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
         ? width * 0.04
         : trackX + trackWidth + width * 0.012;
       const hudWidth = compactLayout
-        ? width * 0.58
+        ? Math.max(1, Math.min(width * 0.58, width - hudX - 142))
         : Math.max(1, width - hudX - width * 0.05);
       const songProgress = Math.min(
         1,
@@ -559,49 +595,70 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
           presenceHeight,
         );
       }
-      const starPowerActive = state.starPowerActiveUntil > now;
-      const starPowerY = presenceY + presenceHeight + 5;
+      const presenceContentHeight = state.noFail
+        ? Math.max(presenceHeight, Math.max(10, barHeight * 1.2))
+        : presenceHeight;
+      const starPowerY = presenceY + presenceContentHeight + 5;
       const starPowerLabelWidth = Math.max(15, barHeight * 2.4);
       const starPowerBarWidth = Math.max(1, hudWidth - starPowerLabelWidth);
-      ctx.fillStyle = "rgba(255,255,255,.82)";
-      ctx.font = `800 ${Math.max(9, barHeight)}px sans-serif`;
-      ctx.textAlign = "left";
-      ctx.textBaseline = "middle";
-      ctx.fillText("SP", hudX, starPowerY + barHeight / 2);
-      ctx.fillStyle = "rgba(255,255,255,.22)";
-      ctx.fillRect(
-        hudX + starPowerLabelWidth,
-        starPowerY,
-        starPowerBarWidth,
-        barHeight,
+      const activeDuration =
+        state.starPowerActiveUntil - state.starPowerActivatedAt;
+      const activeCharge =
+        starPowerActive && activeDuration > 0
+          ? 50 *
+            Math.max(0, (state.starPowerActiveUntil - now) / activeDuration)
+          : 0;
+      const shownStarPowerCharge = Math.min(
+        100,
+        state.starPowerCharge + activeCharge,
       );
-      ctx.fillStyle = starPowerActive ? "#fff27a" : "#69e5ff";
-      ctx.fillRect(
-        hudX + starPowerLabelWidth,
-        starPowerY,
-        (starPowerBarWidth * state.starPowerCharge) / 100,
-        barHeight,
-      );
-      if (starPowerActive) {
-        ctx.strokeStyle = "#fff27a";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(
+      if (!state.practiceRange) {
+        ctx.fillStyle = "rgba(255,255,255,.82)";
+        ctx.font = `800 ${Math.max(9, barHeight)}px sans-serif`;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText("SP", hudX, starPowerY + barHeight / 2);
+        ctx.fillStyle = "rgba(255,255,255,.22)";
+        ctx.fillRect(
           hudX + starPowerLabelWidth,
           starPowerY,
           starPowerBarWidth,
           barHeight,
         );
+        ctx.fillStyle = starPowerActive ? "#fff27a" : "#69e5ff";
+        ctx.fillRect(
+          hudX + starPowerLabelWidth,
+          starPowerY,
+          (starPowerBarWidth * shownStarPowerCharge) / 100,
+          barHeight,
+        );
+        if (starPowerActive) {
+          ctx.strokeStyle = "#fff27a";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(
+            hudX + starPowerLabelWidth,
+            starPowerY,
+            starPowerBarWidth,
+            barHeight,
+          );
+        }
       }
 
       ctx.textAlign = "right";
       ctx.textBaseline = "middle";
       ctx.fillStyle = "#fff";
-      ctx.font = `800 ${Math.max(14, Math.min(34, width * 0.035))}px sans-serif`;
-      ctx.fillText(
-        formatNumber(state.score),
-        hudX + hudWidth,
-        height * (compactLayout ? 0.13 : 0.19),
-      );
+      const scoreFontSize = Math.max(14, Math.min(34, width * 0.035));
+      const scoreY = compactLayout
+        ? Math.max(
+            height * 0.13,
+            starPowerY +
+              (state.practiceRange ? 0 : barHeight) +
+              5 +
+              scoreFontSize / 2,
+          )
+        : height * 0.19;
+      ctx.font = `800 ${scoreFontSize}px sans-serif`;
+      ctx.fillText(formatNumber(state.score), hudX + hudWidth, scoreY);
       let practiceStatsLabel = "";
       if (state.practiceRange) {
         const accuracy =
@@ -614,7 +671,9 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
         ctx.fillText(
           `${accuracy}%  ${state.hits} ${t("game.hits")}  ${state.misses} ${t("game.miss")}`,
           hudX,
-          height * (compactLayout ? 0.17 : 0.24),
+          compactLayout
+            ? Math.max(height * 0.17, scoreY + scoreFontSize / 2 + 10)
+            : height * 0.24,
         );
         practiceStatsLabel = t("game.accuracy", {
           accuracy,
@@ -625,6 +684,10 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
 
       const multiplierProgress = state.multiplier === 4 ? 10 : state.combo % 10;
       const multiplierColor = multiplierColors[state.multiplier - 1];
+      const shownMultiplier = state.multiplier * (starPowerActive ? 2 : 1);
+      const displayedMultiplierColor = starPowerActive
+        ? "#69e5ff"
+        : multiplierColor;
       const segmentGap = 2;
       const orbRadius = Math.min(
         compactLayout ? 16 : 24,
@@ -667,7 +730,7 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
       ctx.fillStyle = "rgba(12,8,20,.9)";
       ctx.fill();
       ctx.lineWidth = 2;
-      ctx.strokeStyle = multiplierColor;
+      ctx.strokeStyle = displayedMultiplierColor;
       ctx.stroke();
       if (state.combo > 0 && getFullComboStatus(state) !== "broken") {
         ctx.save();
@@ -683,20 +746,21 @@ export function createGameRenderer({ canvas, state, keys, colors }) {
         ctx.stroke();
         ctx.restore();
       }
-      ctx.fillStyle = multiplierColor;
+      ctx.fillStyle = displayedMultiplierColor;
       ctx.textAlign = "center";
       ctx.font = `bold ${Math.max(10, orbRadius * 1.05)}px sans-serif`;
-      const shownMultiplier = state.multiplier * (starPowerActive ? 2 : 1);
       ctx.fillText(`x${shownMultiplier}`, orbX, orbY);
       const canvasLabel = t("game.canvasLabel", {
         score: formatNumber(state.score),
         practiceStatsLabel: practiceStatsLabel ? ` ${practiceStatsLabel}` : "",
         combo: state.combo,
         multiplier: shownMultiplier,
-        starPower: t("game.starPower", {
-          charge: Math.floor(state.starPowerCharge),
-          active: starPowerActive ? t("game.starPowerActive") : "",
-        }),
+        starPower: state.practiceRange
+          ? ""
+          : t("game.starPower", {
+              charge: Math.floor(shownStarPowerCharge),
+              active: starPowerActive ? t("game.starPowerActive") : "",
+            }),
         progress: Math.floor(songProgress * 100),
         stagePresence: t("game.stagePresence", {
           presence: state.stagePresence,

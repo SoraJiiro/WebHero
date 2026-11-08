@@ -75,7 +75,8 @@
 .web-hero-key:focus-visible,
 .web-hero-pad:focus-visible,
 .web-hero-strum-key:focus-visible,
-#web-hero-pause-key:focus-visible {
+#web-hero-pause-key:focus-visible,
+#web-hero-star-power-key:focus-visible {
   outline-offset: 1px;
 }
 
@@ -648,6 +649,9 @@ button:disabled {
   color: var(--muted);
   font-size: 0.78rem;
 }
+.result-return[hidden] {
+  display: none;
+}
 .result-return:hover {
   background: rgba(255, 255, 255, 0.04);
   color: var(--text);
@@ -905,7 +909,8 @@ button:disabled {
 .web-hero-key,
 .web-hero-pad,
 .web-hero-strum-key,
-#web-hero-pause-key {
+#web-hero-pause-key,
+#web-hero-star-power-key {
   width: 30px;
   padding: 0;
   border: 0;
@@ -917,15 +922,6 @@ button:disabled {
   text-align: center;
   text-transform: uppercase;
   cursor: pointer;
-}
-
-.touch-lane:active,
-.touch-lane.is-pressed {
-  transform: translateY(2px) scale(0.97);
-  filter: brightness(1.45);
-  box-shadow:
-    0 0 24px currentColor,
-    inset 0 0 18px rgba(255, 255, 255, 0.22);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -1045,6 +1041,7 @@ button:disabled {
 }
 .pause-map .web-hero-key,
 #web-hero-pause-key,
+#web-hero-star-power-key,
 .pause-map .web-hero-pad,
 .web-hero-strum-key {
   width: auto;
@@ -1077,56 +1074,6 @@ button:disabled {
     display: flex;
     justify-content: space-between;
     gap: 8px;
-  }
-  .touch-lane {
-    width: 48px;
-    min-width: 48px;
-    height: 48px;
-    min-height: 48px;
-    padding: 0;
-    border-radius: 50%;
-    touch-action: none;
-    user-select: none;
-    -webkit-user-select: none;
-    -webkit-tap-highlight-color: transparent;
-    font-size: 1.15rem;
-    line-height: 1;
-    box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.35);
-  }
-  .touch-lane.lane-0 {
-    border-color: rgba(255, 79, 100, 0.62);
-    background: #2b171c;
-  }
-  .touch-lane.lane-1 {
-    border-color: rgba(255, 179, 71, 0.62);
-    background: #2b2116;
-  }
-  .touch-lane.lane-2 {
-    border-color: rgba(255, 225, 74, 0.62);
-    background: #2b2917;
-  }
-  .touch-lane.lane-3 {
-    border-color: rgba(99, 230, 190, 0.62);
-    background: #172a25;
-  }
-  .touch-lane.lane-4 {
-    border-color: rgba(116, 167, 255, 0.62);
-    background: #17212c;
-  }
-  .touch-lane:nth-child(1) {
-    --lane-x: 10%;
-  }
-  .touch-lane:nth-child(2) {
-    --lane-x: 30%;
-  }
-  .touch-lane:nth-child(3) {
-    --lane-x: 50%;
-  }
-  .touch-lane:nth-child(4) {
-    --lane-x: 70%;
-  }
-  .touch-lane:nth-child(5) {
-    --lane-x: 90%;
   }
   .touch-pause {
     min-width: 60px;
@@ -1176,16 +1123,9 @@ button:disabled {
     display: none;
   }
   .is-playing .touch-controls {
-    --lane-center-offset: 24px;
     position: absolute;
     inset: 0;
     display: block;
-  }
-  .is-playing .touch-lane {
-    position: absolute;
-    top: calc(100% - 90px - var(--lane-center-offset));
-    left: calc(var(--lane-x) - var(--lane-center-offset));
-    pointer-events: auto;
   }
   .is-playing .touch-pause {
     position: absolute;
@@ -1204,53 +1144,10 @@ button:disabled {
 }
 
 @media (any-pointer: coarse) and (max-width: 360px) {
-  .is-playing .touch-lane {
-    width: 44px;
-    min-width: 44px;
-    height: 44px;
-    min-height: 44px;
-    top: calc(100% - 112px);
-  }
-  .is-playing .touch-lane:nth-child(1) {
-    left: calc(10% - 22px);
-  }
-  .is-playing .touch-lane:nth-child(2) {
-    left: calc(30% - 22px);
-  }
-  .is-playing .touch-lane:nth-child(3) {
-    left: calc(50% - 22px);
-  }
-  .is-playing .touch-lane:nth-child(4) {
-    left: calc(70% - 22px);
-  }
-  .is-playing .touch-lane:nth-child(5) {
-    left: calc(90% - 22px);
-  }
   .is-playing .touch-pause {
     min-width: 52px;
     padding: 0 4px;
     font-size: 0.72rem;
-  }
-  .is-playing .touch-controls {
-    --lane-center-offset: 22px;
-  }
-}
-
-@media (any-pointer: coarse) and (min-width: 761px) {
-  .touch-lane:nth-child(1) {
-    --lane-x: 30%;
-  }
-  .touch-lane:nth-child(2) {
-    --lane-x: 40%;
-  }
-  .touch-lane:nth-child(3) {
-    --lane-x: 50%;
-  }
-  .touch-lane:nth-child(4) {
-    --lane-x: 60%;
-  }
-  .touch-lane:nth-child(5) {
-    --lane-x: 70%;
   }
 }
 
@@ -1391,9 +1288,6 @@ button:disabled {
 }
 
 @media (max-height: 520px) {
-  .is-playing .touch-controls {
-    --lane-center-offset: 22px;
-  }
   .app-shell {
     height: auto;
     min-height: 100dvh;
@@ -1429,12 +1323,6 @@ button:disabled {
   }
   .touch-controls {
     gap: 6px;
-  }
-  .touch-lane {
-    width: 44px;
-    min-width: 44px;
-    height: 44px;
-    min-height: 44px;
   }
   .game-over {
     padding: 10px;
