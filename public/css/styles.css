@@ -12,7 +12,7 @@
   --accent: #ffd400;
   --accent-dim: color-mix(in srgb, var(--accent), #000 48%);
   --crimson: #c5003c;
-  --lanes: #ff4f64, #ffb347, #ffe14a, #63e6be, #74a7ff;
+  --lanes: #63e6be, #ff4f64, #ffe14a, #74a7ff, #ffb347;
   --danger: #ff0f0f;
 }
 
@@ -219,6 +219,19 @@ h1 span {
 }
 .toolbar-action > button {
   height: 42px;
+}
+.chart-import-actions {
+  display: flex;
+  gap: 6px;
+}
+.chart-import-actions #web-hero-chart-import {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.chart-import-actions #web-hero-chart-zip-import {
+  width: 42px;
+  flex: 0 0 42px;
+  padding: 0;
 }
 .toolbar-action:has(#web-hero-stop[hidden]) {
   display: none;
@@ -892,19 +905,19 @@ button:disabled {
   font-size: 0.8rem;
 }
 .lane-0 {
-  color: #ff4f64;
-}
-.lane-1 {
-  color: #ffb347;
-}
-.lane-2 {
-  color: #ffea2b;
-}
-.lane-3 {
   color: #63e6be;
 }
-.lane-4 {
+.lane-1 {
+  color: #ff4f64;
+}
+.lane-2 {
+  color: #ffe14a;
+}
+.lane-3 {
   color: #74a7ff;
+}
+.lane-4 {
+  color: #ffb347;
 }
 .web-hero-key,
 .web-hero-pad,

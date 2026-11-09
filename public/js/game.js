@@ -11,7 +11,11 @@ import {
   scheduleWebHeroBeats,
   scheduleWebHeroTrack,
 } from "./web_hero_chart.mjs";
-import { parseSongIni, selectChartFolderFiles } from "./chart-import.mjs";
+import {
+  extractChartArchive,
+  parseSongIni,
+  selectChartFolderFiles,
+} from "./chart-import.mjs";
 import {
   markLastChartPlayed,
   removeLastChart,
@@ -55,7 +59,7 @@ const HIGHWAY_BACKGROUND_KEY = "web-hero-highway-background";
 const REWIND_MS = 3000;
 const END_SILENCE_MS = 2200;
 const END_FADE_MS = 900;
-const COLORS = ["#ff4f64", "#ffb347", "#ffe14a", "#63e6be", "#74a7ff"];
+const COLORS = ["#63e6be", "#ff4f64", "#ffe14a", "#74a7ff", "#ffb347"];
 const DIFFICULTIES = {
   easy: { label: "Facile", travelTime: 3200 },
   medium: { label: "Moyen", travelTime: 2400 },
@@ -66,6 +70,8 @@ const DIFFICULTY_ORDER = Object.keys(DIFFICULTIES);
 
 export function initWebHero(socket = null) {
   initI18n();
+  const logAction = (action, details = {}) =>
+    console.info("[WebHero client]", action, details);
   const stage = document.getElementById("jeu");
   const canvas = document.getElementById("web-hero-canvas");
   const startButton = document.getElementById("web-hero-start");
@@ -73,6 +79,10 @@ export function initWebHero(socket = null) {
   const chartImportButton = document.getElementById("web-hero-chart-import");
   const chartUnloadButton = document.getElementById("web-hero-chart-unload");
   const chartFileInput = document.getElementById("web-hero-chart-file");
+  const chartZipImportButton = document.getElementById(
+    "web-hero-chart-zip-import",
+  );
+  const chartZipFileInput = document.getElementById("web-hero-chart-zip-file");
   const difficultySelect = document.getElementById("web-hero-difficulty");
   const chartSpeedInput = document.getElementById("web-hero-chart-speed");
   const chartSpeedValue = document.getElementById("web-hero-chart-speed-value");
@@ -113,6 +123,8 @@ export function initWebHero(socket = null) {
     !chartImportButton ||
     !chartUnloadButton ||
     !chartFileInput ||
+    !chartZipImportButton ||
+    !chartZipFileInput ||
     !difficultySelect ||
     !chartSpeedInput ||
     !chartSpeedValue ||
@@ -329,6 +341,7 @@ export function initWebHero(socket = null) {
 
   function setChartControlsDisabled(disabled) {
     chartImportButton.disabled = disabled;
+    chartZipImportButton.disabled = disabled;
     difficultySelect.disabled = disabled || !state.chart;
     chartUnloadButton.disabled = disabled || !state.chart;
     chartSpeedInput.disabled = disabled;
@@ -403,6 +416,7 @@ export function initWebHero(socket = null) {
       ) {
         starPowerKey = event.code;
         localStorage.setItem("web-hero-star-power-key", starPowerKey);
+        logAction("input.key.remapped", { action: "starpower" });
       }
       starPowerKeyLearn = false;
       showStarPowerKey();
@@ -413,6 +427,7 @@ export function initWebHero(socket = null) {
       if (event.code !== starPowerKey) {
         pauseKey = event.code;
         localStorage.setItem("web-hero-pause-key", pauseKey);
+        logAction("input.key.remapped", { action: "pause" });
       }
       pauseKeyLearn = false;
       showPauseKey();
@@ -424,6 +439,7 @@ export function initWebHero(socket = null) {
       if (event.code !== starPowerKey) {
         strumKeys[i] = event.code;
         localStorage.setItem("web-hero-strum-keys", JSON.stringify(strumKeys));
+        logAction("input.key.remapped", { action: `strum-${i}` });
       }
       strumKeyLearn = -1;
       showStrumKey(i);
@@ -447,6 +463,7 @@ export function initWebHero(socket = null) {
     if (!keys.includes(value) && event.code !== starPowerKey) {
       keys[lane] = value;
       localStorage.setItem("web-hero-keys", JSON.stringify(keys));
+      logAction("input.key.remapped", { action: "lane", lane });
     }
     keyLearn = -1;
     showKey(lane);
@@ -655,7 +672,7 @@ export function initWebHero(socket = null) {
                   Math.abs(n.hitAt - note.hitAt) < 1,
               )
             : [note];
-          mates.forEach((n) => (n.missed = true));
+          mates.forEach(markNoteMissed);
           registerMiss();
         }
       }
@@ -701,10 +718,19 @@ export function initWebHero(socket = null) {
     state.animation = requestAnimationFrame(frame);
   }
 
+  function markNoteMissed(note) {
+    note.missed = true;
+    const phrase = state.starPowerPhrases.find(
+      (item) => item.id === note.starPowerPhrase,
+    );
+    if (phrase) phrase.failed = true;
+  }
+
   function registerMiss() {
     if (!state.running) return;
     state.fullComboBroken = true;
     state.misses += 1;
+    logAction("game.miss", { count: state.misses });
     state.maxCombo = Math.max(state.maxCombo, state.combo);
     state.combo = 0;
     state.multiplier = 1;
@@ -733,6 +759,7 @@ export function initWebHero(socket = null) {
       }
     }
     state.overHits += 1;
+    logAction("game.overhit", { count: state.overHits });
     state.maxCombo = Math.max(state.maxCombo, state.combo);
     state.combo = 0;
     state.multiplier = 1;
@@ -759,6 +786,13 @@ export function initWebHero(socket = null) {
     state.ending = false;
     pauseEl.hidden = true;
     state.running = false;
+    logAction("game.finish", {
+      completed,
+      stopped,
+      score: state.score,
+      hits: state.hits,
+      misses: state.misses,
+    });
     stopSong();
     stage.classList.remove("is-playing");
     cancelAnimationFrame(state.animation);
@@ -868,6 +902,7 @@ export function initWebHero(socket = null) {
 
   function pause() {
     if (!state.running || state.paused || state.ending) return;
+    logAction("game.pause");
     state.paused = true;
     state.pausedAt = performance.now();
     cancelAnimationFrame(state.animation);
@@ -1064,6 +1099,7 @@ export function initWebHero(socket = null) {
 
   function restartPractice() {
     if (!state.running || !state.practiceRange || state.ending) return;
+    logAction("practice.restart");
     cancelAnimationFrame(state.animation);
     clearHeldKeys();
     state.paused = false;
@@ -1082,6 +1118,7 @@ export function initWebHero(socket = null) {
 
   function resume() {
     if (!state.running || !state.paused) return;
+    logAction("game.resume");
     const now = performance.now();
     shiftTimes(now - state.pausedAt);
     rewindChart(REWIND_MS);
@@ -1138,6 +1175,7 @@ export function initWebHero(socket = null) {
         error: () => translateError(error),
       });
       console.error("Impossible de préparer la bande-son importée.", error);
+      logAction("game.start.failed", { reason: "audio" });
       return;
     }
     if (savedChartRecord?.audioFiles.length && !audioBuffers.length) {
@@ -1188,6 +1226,11 @@ export function initWebHero(socket = null) {
       : null;
     const schedule = scheduleTimeline(state.practiceTrack, startAt);
     state.running = true;
+    logAction("game.start", {
+      difficulty: chartDifficulty,
+      practice: Boolean(state.practiceRange),
+      audioTracks: audioBuffers.length,
+    });
     if (lastChartId) markLastChartPlayed(localStorage, lastChartId);
     stage.classList.add("is-playing");
     gameOverEl.hidden = true;
@@ -1278,6 +1321,12 @@ export function initWebHero(socket = null) {
       (item) => item.id === hitNote.starPowerPhrase,
     );
     if (phrase) phrase.hits = (phrase.hits || 0) + 1;
+    logAction("game.hit", {
+      lane,
+      type: hitNote.type,
+      delayMs: Math.round(now - hitNote.hitAt),
+      combo: state.combo,
+    });
   }
 
   function getStarPowerFactor(now) {
@@ -1288,24 +1337,37 @@ export function initWebHero(socket = null) {
     for (const phrase of state.starPowerPhrases) {
       if (phrase.settled || now < phrase.endAt + 300) continue;
       phrase.settled = true;
-      if (phrase.hits === phrase.noteCount)
+      logAction("starpower.phrase", {
+        complete: !phrase.failed && phrase.hits === phrase.noteCount,
+        hits: phrase.hits || 0,
+        total: phrase.noteCount,
+      });
+      if (!phrase.failed && phrase.hits === phrase.noteCount)
         state.starPowerCharge = Math.min(100, state.starPowerCharge + 25);
     }
   }
 
   function activateStarPower() {
     const now = performance.now();
-    if (
-      !state.running ||
-      state.paused ||
-      state.ending ||
-      state.starPowerCharge < 50 ||
-      state.starPowerActiveUntil > now
-    )
+    const reason = !state.running
+      ? "not-running"
+      : state.paused
+        ? "paused"
+        : state.ending
+          ? "ending"
+          : state.starPowerCharge < 50
+            ? "charge"
+            : state.starPowerActiveUntil > now
+              ? "already-active"
+              : null;
+    if (reason) {
+      logAction("starpower.rejected", { reason });
       return;
+    }
     state.starPowerCharge -= 50;
     state.starPowerActivatedAt = now;
     state.starPowerActiveUntil = now + 8000;
+    logAction("starpower.activated", { charge: state.starPowerCharge });
   }
 
   function creditSustain(note, at) {
@@ -1357,6 +1419,7 @@ export function initWebHero(socket = null) {
       registerMiss();
       return;
     }
+    if (!fretsMatch([lane], [...getHeldLanes(), lane])) return;
     const index = findHitNote(state.notes, [lane], now);
     if (index < 0) {
       const expiredIndex = state.notes.findIndex(
@@ -1364,6 +1427,7 @@ export function initWebHero(socket = null) {
           note.lane === lane && !note.hitRegistered && now > note.missAt,
       );
       if (expiredIndex >= 0) {
+        markNoteMissed(state.notes[expiredIndex]);
         state.notes.splice(expiredIndex, 1);
         registerMiss();
         return;
@@ -1405,6 +1469,7 @@ export function initWebHero(socket = null) {
 
   function strum() {
     if (!state.running || state.paused || state.ending) return;
+    logAction("input.strum");
     const now = performance.now();
     if (state.longPauses.some((p) => now >= p.startAt && now < p.endAt)) return;
     const group = findGuitarGroup(state.notes, now);
@@ -1451,6 +1516,7 @@ export function initWebHero(socket = null) {
   function release(key) {
     if (!state.running) return;
     const lane = keys.indexOf(key.toLowerCase());
+    if (lane >= 0) logAction("input.lane.release", { lane });
     const index = state.notes.findIndex(
       (note) => note.lane === lane && note.holding,
     );
@@ -1472,7 +1538,8 @@ export function initWebHero(socket = null) {
   function getHeldLanes() {
     return [...heldKeyboardLanes.values(), ...heldTouchLanes.keys()];
   }
-  function pressLane(lane) {
+  function pressLane(lane, source = guitarMode ? "controller" : "keyboard") {
+    logAction("input.lane.press", { lane, source });
     if (guitarMode) fretDown();
     else hit(lane);
   }
@@ -1510,6 +1577,8 @@ export function initWebHero(socket = null) {
     if (pointers.size === 0) hit(lane);
     pointers.add(pointerId);
     heldTouchLanes.set(lane, pointers);
+    if (pointers.size === 1)
+      logAction("input.lane.press", { lane, source: "touch" });
   }
 
   function finishTouchPointer(pointerId) {
@@ -1575,8 +1644,12 @@ export function initWebHero(socket = null) {
   quitButton.addEventListener("click", () =>
     finish("status.stopped", { stopped: true }),
   );
-  noFailInput.addEventListener("change", saveSettings);
+  noFailInput.addEventListener("change", () => {
+    logAction("setting.no-fail", { enabled: noFailInput.checked });
+    saveSettings();
+  });
   returnButton?.addEventListener("click", () => {
+    logAction("game.results.dismissed");
     state.ending = false;
     state.endingAt = 0;
     state.fadeAlpha = 0;
@@ -1596,7 +1669,14 @@ export function initWebHero(socket = null) {
     setStatus("status.ready");
     startButton.focus({ preventScroll: true });
   });
-  chartImportButton.addEventListener("click", () => chartFileInput.click());
+  chartImportButton.addEventListener("click", () => {
+    logAction("chart.import.dialog", { source: "folder" });
+    chartFileInput.click();
+  });
+  chartZipImportButton.addEventListener("click", () => {
+    logAction("chart.import.dialog", { source: "zip" });
+    chartZipFileInput.click();
+  });
   document
     .getElementById("fullscreen-button")
     ?.addEventListener("click", async () => {
@@ -1606,6 +1686,9 @@ export function initWebHero(socket = null) {
         } else {
           await stage.requestFullscreen();
         }
+        logAction("display.fullscreen", {
+          enabled: Boolean(document.fullscreenElement),
+        });
       } catch (error) {
         setStatus("status.fullscreenFailed", {
           error: () => translateError(error),
@@ -1614,10 +1697,12 @@ export function initWebHero(socket = null) {
     });
   chartSpeedInput.addEventListener("input", () => {
     chartSpeedValue.value = `${Math.round(Number(chartSpeedInput.value) * 100)} %`;
+    logAction("setting.chart-speed", { value: Number(chartSpeedInput.value) });
     saveSettings();
   });
   hyperspeedInput.addEventListener("input", () => {
     hyperspeedValue.value = `${Number(hyperspeedInput.value).toFixed(1)}×`;
+    logAction("setting.hyperspeed", { value: Number(hyperspeedInput.value) });
     if (!state.running)
       state.travelTime =
         DIFFICULTIES[difficultySelect.value].travelTime /
@@ -1628,6 +1713,7 @@ export function initWebHero(socket = null) {
   noteSizeInput.addEventListener("input", () => {
     state.noteSize = Number(noteSizeInput.value);
     noteSizeValue.value = `${Math.round(state.noteSize * 100)} %`;
+    logAction("setting.note-size", { value: state.noteSize });
     saveSettings();
     draw(performance.now());
   });
@@ -1638,6 +1724,7 @@ export function initWebHero(socket = null) {
     input.addEventListener("input", () => {
       output.value = `${input.value} ms`;
       state[property] = Number(input.value);
+      logAction(`setting.${property}`, { value: state[property] });
       saveSettings();
       draw(performance.now());
     });
@@ -1646,6 +1733,7 @@ export function initWebHero(socket = null) {
     practiceStartSectionSelect.disabled =
       !practiceInput.checked || state.running;
     practiceEndSectionSelect.disabled = !practiceInput.checked || state.running;
+    logAction("setting.practice", { enabled: practiceInput.checked });
     saveSettings();
   });
   function localizedOption(key, value) {
@@ -1672,16 +1760,26 @@ export function initWebHero(socket = null) {
   }
   practiceStartSectionSelect.addEventListener("change", () => {
     updatePracticeEndSections();
+    logAction("setting.practice-start", {
+      section: practiceStartSectionSelect.value,
+    });
     saveSettings();
   });
-  practiceEndSectionSelect.addEventListener("change", saveSettings);
+  practiceEndSectionSelect.addEventListener("change", () => {
+    logAction("setting.practice-end", {
+      section: practiceEndSectionSelect.value,
+    });
+    saveSettings();
+  });
   hitZonePreviewInput.addEventListener("change", () => {
     state.hitZonePreview = hitZonePreviewInput.checked;
+    logAction("setting.hit-zone-preview", { enabled: state.hitZonePreview });
     saveSettings();
     draw(performance.now());
   });
   primaryColorInput.addEventListener("input", () => {
     state.primaryColor = primaryColorInput.value;
+    logAction("setting.primary-color", { value: state.primaryColor });
     document.documentElement.style.setProperty("--accent", state.primaryColor);
     saveSettings();
     draw(performance.now());
@@ -1705,6 +1803,7 @@ export function initWebHero(socket = null) {
       state.highwayBackground = image;
       backgroundNameOutput.value = file.name;
       backgroundClearButton.disabled = false;
+      logAction("setting.background", { loaded: true });
       draw(performance.now());
     } catch (error) {
       setStatus("status.backgroundFailed", {
@@ -1721,6 +1820,7 @@ export function initWebHero(socket = null) {
     state.highwayBackground = "";
     backgroundNameOutput.value = t("custom.noImage");
     backgroundClearButton.disabled = true;
+    logAction("setting.background", { loaded: false });
     draw(performance.now());
   });
   function configureLoadedChart(chart) {
@@ -1760,6 +1860,7 @@ export function initWebHero(socket = null) {
 
   async function unloadCurrentChart() {
     if (!state.chart || state.running) return;
+    logAction("chart.unload.started");
     chartUnloadButton.disabled = true;
     stopSong();
     audioBuffers = [];
@@ -1808,6 +1909,7 @@ export function initWebHero(socket = null) {
     startButton.disabled = true;
     stopButton.hidden = true;
     const removed = await removeLastChart(localStorage);
+    logAction("chart.unload.completed", { savedDataRemoved: removed });
     setStatus(removed ? "status.chartUnloaded" : "status.chartUnloadFailed");
     draw(performance.now());
     chartImportButton.focus({ preventScroll: true });
@@ -1850,13 +1952,19 @@ export function initWebHero(socket = null) {
     }
   }
 
-  chartFileInput.addEventListener("change", async () => {
-    const files = [...chartFileInput.files];
-    if (!files.length) return;
+  async function importChartFiles(files, archive = null) {
+    if (!files.length && !archive) return;
+    logAction("chart.import.started", { source: archive ? "zip" : "folder" });
     try {
       if (state.running) throw new Error(t("status.finishPractice"));
       setChartControlsDisabled(true);
       startButton.disabled = true;
+      if (archive) {
+        importProgress.hidden = false;
+        importProgress.value = 0;
+        setStatus("status.extractingArchive");
+        files = await extractChartArchive(archive);
+      }
       const {
         chartFile: file,
         audioFiles,
@@ -1946,20 +2054,36 @@ export function initWebHero(socket = null) {
             : t("status.noAudioAttached"),
         warning: () => (storageWarning ? t(storageWarning) : ""),
       });
+      logAction("chart.import.completed", {
+        format: extension,
+        audioTracks: audioFiles.length,
+        notes: selectedTrack.track.notes.length,
+      });
     } catch (error) {
       setStatus("status.importFailed", { error: () => translateError(error) });
+      logAction("chart.import.failed", {
+        reason: error instanceof Error ? error.name : "unknown",
+      });
     } finally {
       chartFileInput.value = "";
+      chartZipFileInput.value = "";
       importProgress.hidden = true;
       if (!state.running) {
         setChartControlsDisabled(false);
         startButton.disabled = !state.chart;
       }
     }
-  });
+  }
+  chartFileInput.addEventListener("change", () =>
+    importChartFiles([...chartFileInput.files]),
+  );
+  chartZipFileInput.addEventListener("change", () =>
+    importChartFiles([], chartZipFileInput.files[0]),
+  );
   difficultySelect.addEventListener("change", () => {
     const newDifficulty = difficultySelect.value;
     state.difficulty = newDifficulty;
+    logAction("setting.difficulty", { value: newDifficulty });
     if (!state.running)
       state.travelTime =
         DIFFICULTIES[newDifficulty].travelTime / Number(hyperspeedInput.value);
@@ -1987,6 +2111,7 @@ export function initWebHero(socket = null) {
     }
     const lane = keys.indexOf(event.key.toLowerCase());
     if (lane < 0 || event.ctrlKey || event.altKey || event.metaKey) return;
+    logAction("input.key.down", { lane });
     pressLane(lane);
     heldKeyboardLanes.set(event.code, lane);
   });
@@ -1997,6 +2122,7 @@ export function initWebHero(socket = null) {
       return;
     }
     heldKeyboardLanes.delete(event.code);
+    logAction("input.key.up", { lane });
     release(keys[lane]);
     if (!getHeldLanes().includes(lane)) autoHitLanes.delete(lane);
   });
@@ -2018,6 +2144,7 @@ export function initWebHero(socket = null) {
       padLearn = lane;
       padSeen.clear();
       el.textContent = "…";
+      logAction("input.controller.learn.started", { lane });
     });
   });
   const padWasDown = new Set();
@@ -2042,6 +2169,7 @@ export function initWebHero(socket = null) {
         padSeen.clear();
         localStorage.setItem("web-hero-pad", JSON.stringify(padButtons));
         padEls[padLearn].textContent = padLabel(padLearn);
+        logAction("input.controller.remapped", { lane: padLearn });
         padLearn = -1;
       }
     } else {
@@ -2089,6 +2217,7 @@ export function initWebHero(socket = null) {
   requestAnimationFrame(pollPads);
   window.addEventListener("blur", clearHeldKeys);
   document.addEventListener("visibilitychange", () => {
+    logAction("page.visibility", { hidden: document.hidden });
     if (document.hidden) {
       clearHeldKeys();
       pause();

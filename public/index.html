@@ -21,6 +21,7 @@
     <link rel="icon" type="image/svg+xml" href="./assets/imgs/WH-LOGO.svg" />
     <title data-i18n="meta.title">WebHero — jeu de rythme gratuit</title>
     <link rel="stylesheet" href="./css/styles.css" />
+    <script src="./js/anx.js" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#game-area" data-i18n="nav.skip">Passer au
@@ -53,6 +54,16 @@
             </div>
           </div>
           <div class="toolbar-action">
+            <span><i class="fa-solid fa-info" aria-hidden="true"></i>
+              <span>Informations</span></span>
+            <button id="documentation-button" class="ghost-button" type="button"
+              aria-label="Documentation"
+              title="Documentation"><i
+                class="fa-regular fa-file-lines" aria-hidden="true"></i><span><a
+                  href="./doc.html" class="doc-link"
+                  target="_blank">Documentation</a></span></button>
+          </div>
+          <div class="toolbar-action">
             <span><i class="fa-solid fa-display" aria-hidden="true"></i>
               <span data-i18n="nav.display">Affichage</span></span>
             <button id="fullscreen-button" class="ghost-button" type="button"
@@ -65,12 +76,20 @@
           <div class="toolbar-action">
             <span><i class="fa-solid fa-music" aria-hidden="true"></i>
               <span data-i18n="nav.chart">Chart</span></span>
-            <button id="web-hero-chart-import" type="button"
-              aria-label="Importer un dossier de chart avec notes, fichier INI et pistes audio"
-              title="Importer le dossier d’une chart et ses pistes audio"
-              data-i18n-attrs="aria-label:chart.importAria;title:chart.importTitle"><i
-                class="fa-solid fa-folder-open" aria-hidden="true"></i>
-              <span data-i18n="chart.import">Importer un dossier</span></button>
+            <div class="chart-import-actions">
+              <button id="web-hero-chart-import" type="button"
+                aria-label="Importer un dossier de chart avec notes, fichier INI et pistes audio"
+                title="Importer le dossier d’une chart et ses pistes audio"
+                data-i18n-attrs="aria-label:chart.importAria;title:chart.importTitle"><i
+                  class="fa-solid fa-folder-open" aria-hidden="true"></i>
+                <span data-i18n="chart.import">Importer un
+                  dossier</span></button>
+              <button id="web-hero-chart-zip-import" type="button"
+                aria-label="Importer une archive ZIP de chart"
+                title="Importer une archive ZIP de chart"
+                data-i18n-attrs="aria-label:chart.importZipAria;title:chart.importZipTitle"><i
+                  class="fa-solid fa-file-zipper" aria-hidden="true"></i></button>
+            </div>
           </div>
           <label class="field difficulty-field">
             <span><i class="fa-solid fa-gauge-high" aria-hidden="true"></i>
@@ -95,7 +114,8 @@
             <span><i class="fa-solid fa-gamepad" aria-hidden="true"></i>
               <span data-i18n="nav.session">Session</span></span>
             <button id="web-hero-stop" type="button"
-              aria-label="Arrêter la partie" title="Arrêter la partie en cours"
+              aria-label="Arrêter la partie"
+              title="Arrêter la partie en cours"
               data-i18n-attrs="aria-label:game.stopAria;title:game.stopTitle"
               hidden><i class="fa-solid fa-stop" aria-hidden="true"></i>
               <span data-i18n="game.stop">Arrêter</span></button>
@@ -104,7 +124,8 @@
       </header>
 
       <span id="web-hero-status" role="status"><span
-          id="web-hero-status-text" data-i18n="status.importPrompt">Importe une
+          id="web-hero-status-text" data-i18n="status.importPrompt">Importe
+          une
           chart pour
           commencer.</span><progress id="web-hero-import-progress" max="1"
           value="0" hidden
@@ -133,7 +154,8 @@
             data-i18n="instructions.controls">Choisissez une
             chart et une difficulté, puis appuyez sur Jouer. Appuyez sur les
             touches D, F, J, K et L lorsque les notes atteignent la ligne de
-            frappe, ou utilisez les boutons tactiles. Appuyez sur Espace lorsque
+            frappe, ou utilisez les boutons tactiles. Appuyez sur Espace
+            lorsque
             la jauge Star Power atteint 50 % pour doubler le score pendant 8
             s.</p>
           <div id="web-hero-lyrics" class="lyrics" aria-live="polite"
@@ -142,10 +164,12 @@
             aria-labelledby="web-hero-pause-title" hidden>
             <div class="game-over-card">
               <div class="result-heading">
-                <span id="web-hero-pause-kicker" data-i18n="pause.kicker">ÉCHAP
+                <span id="web-hero-pause-kicker"
+                  data-i18n="pause.kicker">ÉCHAP
                   pour reprendre · START
                   sur la manette</span>
-                <h2 id="web-hero-pause-title" data-i18n="pause.title">PAUSE</h2>
+                <h2 id="web-hero-pause-title"
+                  data-i18n="pause.title">PAUSE</h2>
               </div>
               <button id="web-hero-resume" class="result-replay" type="button"
                 aria-label="Reprendre la partie"
@@ -166,7 +190,8 @@
                 aria-label="Abandonner la partie"
                 data-i18n-attrs="aria-label:pause.quitAria">
                 <i class="fa-solid fa-stop"
-                  aria-hidden="true"></i><span data-i18n="pause.quit">Abandonner
+                  aria-hidden="true"></i><span
+                  data-i18n="pause.quit">Abandonner
                   la partie</span>
               </button>
             </div>
@@ -192,7 +217,8 @@
               </div>
               <div class="result-stats">
                 <div class="result-stat result-accuracy">
-                  <span><i class="fa-solid fa-bullseye" aria-hidden="true"></i>
+                  <span><i class="fa-solid fa-bullseye"
+                      aria-hidden="true"></i>
                     <span data-i18n="results.accuracy">Précision</span></span>
                   <strong id="web-hero-final-accuracy">0%</strong>
                 </div>
@@ -209,11 +235,13 @@
                 <div class="result-stat">
                   <span><i class="fa-solid fa-check-double"
                       aria-hidden="true"></i> <span
-                      data-i18n="results.hitsMisses">Hits / Misses</span></span>
+                      data-i18n="results.hitsMisses">Hits /
+                      Misses</span></span>
                   <strong id="web-hero-final-hits">0 / 0</strong>
                 </div>
                 <div class="result-stat result-delay">
-                  <span><i class="fa-solid fa-stopwatch" aria-hidden="true"></i>
+                  <span><i class="fa-solid fa-stopwatch"
+                      aria-hidden="true"></i>
                     <span data-i18n="results.delay">Délai moyen</span></span>
                   <strong id="web-hero-final-delay">—</strong>
                 </div>
@@ -224,7 +252,8 @@
                   <strong id="web-hero-final-streak">0</strong>
                 </div>
               </div>
-              <button id="web-hero-restart" class="result-replay" type="button"
+              <button id="web-hero-restart" class="result-replay"
+                type="button"
                 aria-label="Rejouer la chart" title="Recommencer cette chart"
                 data-i18n-attrs="aria-label:results.replayAria;title:results.replayTitle">
                 <span data-i18n="results.replay">Rejouer</span><i
@@ -236,7 +265,8 @@
                 title="Fermer les résultats et revenir à l’écran titre"
                 data-i18n-attrs="aria-label:results.returnAria;title:results.returnTitle">
                 <i class="fa-solid fa-arrow-left"
-                  aria-hidden="true"></i><span data-i18n="results.return">Retour
+                  aria-hidden="true"></i><span
+                  data-i18n="results.return">Retour
                   à l’écran titre</span>
               </button>
             </div>
@@ -254,13 +284,15 @@
                   data-i18n="settings.game">Jeu</span></span></div>
             <div class="panel-body">
               <label class="speed-control">
-                <span><i class="fa-solid fa-gauge-high" aria-hidden="true"></i>
+                <span><i class="fa-solid fa-gauge-high"
+                    aria-hidden="true"></i>
                   <span class="speed-label-full"
                     data-i18n="settings.speed">Vitesse</span><span
                     class="speed-label-short"
                     aria-hidden="true"
                     data-i18n="settings.speedShort">Vit.</span></span>
-                <input id="web-hero-chart-speed" type="range" min="0.5" max="1"
+                <input id="web-hero-chart-speed" type="range" min="0.5"
+                  max="1"
                   step="0.05" value="0.75"
                   aria-label="Vitesse de lecture de la chart"
                   aria-describedby="web-hero-chart-speed-value"
@@ -279,7 +311,8 @@
                     class="speed-label-short"
                     aria-hidden="true"
                     data-i18n="settings.hyperspeedShort">Hyper.</span></span>
-                <input id="web-hero-hyperspeed" type="range" min="0.8" max="2.5"
+                <input id="web-hero-hyperspeed" type="range" min="0.8"
+                  max="2.5"
                   step="0.1" value="1.5"
                   aria-label="Vitesse de défilement des notes"
                   aria-describedby="web-hero-hyperspeed-value"
@@ -294,7 +327,8 @@
                     data-i18n="settings.noteSize">Taille des notes</span><span
                     class="speed-label-short" aria-hidden="true"
                     data-i18n="settings.noteSizeShort">Notes</span></span>
-                <input id="web-hero-note-size" type="range" min="0.5" max="1.5"
+                <input id="web-hero-note-size" type="range" min="0.5"
+                  max="1.5"
                   step="0.05" value="1" aria-label="Taille des notes"
                   aria-describedby="web-hero-note-size-value"
                   title="Régler la taille des notes"
@@ -319,7 +353,8 @@
                 <span data-i18n="settings.start">Début</span>
                 <span class="select-wrap">
                   <select id="web-hero-practice-start-section" disabled>
-                    <option value="-1" data-i18n="settings.chartBeginning">Début
+                    <option value="-1"
+                      data-i18n="settings.chartBeginning">Début
                       de la chart</option>
                   </select>
                   <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
@@ -337,7 +372,8 @@
               </label>
               <button id="web-hero-chart-unload"
                 class="background-clear chart-unload"
-                type="button" disabled aria-label="Décharger la chart courante"
+                type="button" disabled
+                aria-label="Décharger la chart courante"
                 title="Décharger la chart et supprimer sa sauvegarde locale"
                 data-i18n-attrs="aria-label:chart.unloadAria;title:chart.unloadTitle">
                 <i class="fa-solid fa-eject" aria-hidden="true"></i>
@@ -355,7 +391,8 @@
               <label class="speed-control"
                 title="Négatif : musique plus tôt (compense un audio en retard, ex. Bluetooth)"
                 data-i18n-attrs="title:settings.audioDelayTitle">
-                <span><i class="fa-solid fa-volume-high" aria-hidden="true"></i>
+                <span><i class="fa-solid fa-volume-high"
+                    aria-hidden="true"></i>
                   <span class="speed-label-full"
                     data-i18n="settings.audioDelay">Délai audio</span><span
                     class="speed-label-short"
@@ -398,7 +435,8 @@
             aria-label="Configuration de la manette"
             data-i18n-attrs="aria-label:controller.config">
             <div class="panel-head">
-              <span class="footer-section-label"><i class="fa-solid fa-gamepad"
+              <span class="footer-section-label"><i
+                  class="fa-solid fa-gamepad"
                   aria-hidden="true"></i> <span
                   data-i18n="controller.label">Manette</span></span>
               <output id="web-hero-pad-debug" class="footer-section-label"
@@ -442,7 +480,8 @@
                   data-i18n-attrs="aria-label:controller.strumUpAria;title:controller.learnTitle"></button></label>
               <label class="pause-map" title="Strum bas"
                 data-i18n-attrs="title:controller.strumDown"><i
-                  class="fa-solid fa-arrow-down" aria-hidden="true"></i><button
+                  class="fa-solid fa-arrow-down"
+                  aria-hidden="true"></i><button
                   class="web-hero-pad" type="button"
                   aria-label="Bouton de strum bas de la manette"
                   title="Cliquer puis appuyer sur un bouton de la manette"
@@ -510,7 +549,8 @@
                   data-i18n-attrs="aria-label:keyboard.strumUp;title:keyboard.learnTitle"></button></label>
               <label class="pause-map" title="Strum bas"
                 data-i18n-attrs="title:keyboard.strumDown"><i
-                  class="fa-solid fa-arrow-down" aria-hidden="true"></i><button
+                  class="fa-solid fa-arrow-down"
+                  aria-hidden="true"></i><button
                   class="web-hero-strum-key" type="button"
                   aria-label="Touche de strum bas"
                   title="Cliquer puis appuyer sur une touche"
@@ -581,11 +621,17 @@
           data-i18n-attrs="aria-label:file.chart;title:file.chartTitle"
           accept=".chart,.mid,.midi,.ini,.aac,.flac,.m4a,.mp3,.ogg,.opus,.wav"
           webkitdirectory directory multiple hidden />
+        <input id="web-hero-chart-zip-file" type="file" accept=".zip,application/zip"
+          aria-label="Sélectionner une archive ZIP de chart"
+          data-i18n-attrs="aria-label:chart.importZipAria" hidden />
       </footer>
     </div>
 
     <script async src="https://kit.fontawesome.com/9a6b0f1631.js"
       crossorigin="anonymous"></script>
+    <script type="importmap">
+      { "imports": { "fflate": "./js/fflate.browser.js" } }
+    </script>
     <script type="module" src="./js/game.js"></script>
   </body>
 </html>

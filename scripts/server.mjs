@@ -18,6 +18,16 @@ const contentTypes = {
 
 export function createWebHeroServer() {
   return createServer(async (request, response) => {
+    const startedAt = performance.now();
+    const loggedPath = (request.url || "/").split("?")[0];
+    response.once("finish", () => {
+      console.info("[WebHero server]", {
+        method: request.method,
+        path: loggedPath,
+        status: response.statusCode,
+        durationMs: Math.round(performance.now() - startedAt),
+      });
+    });
     const url = new URL(request.url, `http://${request.headers.host || "localhost"}`);
     if (request.method !== "GET" && request.method !== "HEAD") {
       response.writeHead(405, { allow: "GET, HEAD" });

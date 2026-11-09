@@ -108,7 +108,7 @@ export function parseWebHeroChart(text) {
       }),
     );
     const starPowerPhrases = [
-      ...body.matchAll(/^\s*(\d+)\s*=\s*S\s+2\s+\d+\s+(\d+)\s*$/gm),
+      ...body.matchAll(/^\s*(\d+)\s*=\s*S\s+2(?:\s+\d+)?\s+(\d+)\s*$/gm),
     ].map(([, tick, length]) => ({
       start: Number(tick),
       end: Number(tick) + Number(length),

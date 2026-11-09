@@ -23,6 +23,8 @@ const messages = {
     "chart.importAria":
       "Importer un dossier de chart avec notes, fichier INI et pistes audio",
     "chart.importTitle": "Importer le dossier d’une chart et ses pistes audio",
+    "chart.importZipAria": "Importer une archive ZIP de chart",
+    "chart.importZipTitle": "Importer une archive ZIP de chart",
     "chart.unload": "Décharger la chart",
     "chart.unloadAria": "Décharger la chart courante",
     "chart.unloadTitle": "Décharger la chart et supprimer sa sauvegarde locale",
@@ -187,6 +189,7 @@ const messages = {
       "Chart déchargée, mais impossible de supprimer sa sauvegarde locale.",
     "status.progress": "{label} — {percent} %",
     "status.readingChart": "Lecture de la chart",
+    "status.extractingArchive": "Extraction de l’archive ZIP",
     "status.audioProgress": "Audio {current}/{total}",
     "status.savingChart": "Sauvegarde locale de la chart et de l’audio…",
     "status.importFailed": "Import impossible : {error}",
@@ -238,6 +241,8 @@ const messages = {
     "chart.importAria":
       "Import a chart folder with notes, INI file, and audio tracks",
     "chart.importTitle": "Import a chart folder and its audio tracks",
+    "chart.importZipAria": "Import a chart ZIP archive",
+    "chart.importZipTitle": "Import a chart ZIP archive",
     "chart.unload": "Unload chart",
     "chart.unloadAria": "Unload current chart",
     "chart.unloadTitle": "Unload the chart and remove its local save",
@@ -399,6 +404,7 @@ const messages = {
       "Chart unloaded, but its local save could not be removed.",
     "status.progress": "{label} — {percent}%",
     "status.readingChart": "Reading chart",
+    "status.extractingArchive": "Extracting ZIP archive",
     "status.audioProgress": "Audio {current}/{total}",
     "status.savingChart": "Saving chart and audio locally…",
     "status.importFailed": "Import failed: {error}",

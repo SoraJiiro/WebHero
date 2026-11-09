@@ -1,3 +1,5 @@
+import { unzip } from "fflate";
+
 const chartExtensions = new Set(["chart", "mid", "midi"]);
 const audioExtensions = new Set([
   "aac",
@@ -14,12 +16,41 @@ function extension(name) {
 }
 
 function relativePath(file) {
-  return file.webkitRelativePath || file.name;
+  return file.webkitRelativePath || file.archivePath || file.name;
 }
 
 function directory(path) {
   const index = path.lastIndexOf("/");
   return index < 0 ? "" : path.slice(0, index);
+}
+
+export async function extractChartArchive(file) {
+  const data = new Uint8Array(await file.arrayBuffer());
+  const archiveFiles = await new Promise((resolve, reject) => {
+    unzip(
+      data,
+      {
+        filter: ({ name }) => {
+          const path = name.replaceAll("\\", "/");
+          return (
+            !path.startsWith("/") &&
+            !path.split("/").includes("..") &&
+            !path.endsWith("/") &&
+            new Set([...chartExtensions, ...audioExtensions, "ini"]).has(
+              extension(path),
+            )
+          );
+        },
+      },
+      (error, files) => (error ? reject(error) : resolve(files)),
+    );
+  });
+  return Object.entries(archiveFiles).map(([path, content]) => {
+    const archivePath = path.replaceAll("\\", "/");
+    const file = new File([content], archivePath.split("/").at(-1));
+    Object.defineProperty(file, "archivePath", { value: archivePath });
+    return file;
+  });
 }
 
 export function selectChartFolderFiles(files) {

@@ -7,14 +7,15 @@ export const TARGET_MAX_RADIUS = 30;
 export const NOTE_MAX_RADIUS = 26;
 
 // Feuille de sprites : colonnes vert/rouge/jaune/bleu/orange ; lignes 0 note, 1 lumineuse, 2 vitre.
-const SPRITE_COL = [1, 4, 2, 0, 3];
+const SPRITE_COL = [0, 1, 2, 3, 4];
 const SPRITE_PITCH = { x: 100, y: 500 / 6 };
 const SPRITE_ART = { dx: 1, dy: 1, w: 98, h: 500 / 6 - 2 };
 const STAR_POWER_COL = { strum: 0, hopo: 1, tap: 2 };
+const STAR_POWER_ROW = 3;
 const STAR_POWER_ACTIVE_ROW = 5;
 
 const HITTER = {
-  columnX: [338.75, 1215, 628, 30, 921.75],
+  columnX: [30, 338.75, 628, 921.75, 1215],
   rowY: [12, 340, 650],
   rowH: [289, 289, 320],
   centerY: [168, 163, 165],
@@ -502,8 +503,17 @@ export function createGameRenderer({ canvas, state, colors }) {
         const row = note.type === "tap" ? 2 : note.type === "hopo" ? 1 : 0;
         const noteWidth = spriteWidth * projection;
         const noteHeight = (spriteWidth * SPRITE_ART.h) / SPRITE_ART.w;
-        if (state.practiceRange || note.starPowerPhrase === undefined)
+        const phrase = state.starPowerPhrases?.find(
+          ({ id }) => id === note.starPowerPhrase,
+        );
+        if (
+          state.practiceRange ||
+          note.starPowerPhrase === undefined ||
+          phrase?.failed
+        )
           drawSprite(note.lane, row, x, y, noteWidth, noteHeight);
+        else if (!starPowerActive)
+          drawSprite(note.lane, STAR_POWER_ROW, x, y, noteWidth, noteHeight);
         else drawStarPowerSprite(note.type, x, y, noteWidth, noteHeight);
         ctx.globalAlpha = 1;
         return;

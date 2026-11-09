@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "start": "node scripts/server.mjs",
+    "start": "npm run build && node scripts/server.mjs",
     "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3"
   }
 }
