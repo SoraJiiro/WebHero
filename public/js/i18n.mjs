@@ -1,7 +1,14 @@
 const STORAGE_KEY = "web-hero-language";
 const dynamicValues = new WeakMap();
+const originalI18nHtml = new WeakMap();
 const messages = {
   fr: {
+    "doc.title": "WebHero — Documentation",
+    "doc.metaDescription":
+      "Guide WebHero : importer une chart, jouer au clavier, à la manette ou au tactile, et régler le jeu.",
+    "doc.socialDescription": "Guide de jeu et aide pour WebHero.",
+    "doc.brandLabel": "WebHero, retour au jeu",
+    "doc.contentsLabel": "Sommaire",
     "meta.title": "WebHero — jeu de rythme gratuit",
     "meta.description":
       "Joue à WebHero, un jeu de rythme gratuit inspiré de Guitar Hero. Lance une chart, règle la difficulté et joue au clavier ou sur écran tactile.",
@@ -95,6 +102,7 @@ const messages = {
     "settings.noFailTitle":
       "Pas de stage presence ni de game over ; score non enregistré",
     "settings.noFail": "No-Fail Mode",
+    "settings.autoStrum": "Auto strum",
     "settings.practice": "Practice",
     "settings.start": "Début",
     "settings.end": "Fin",
@@ -220,6 +228,143 @@ const messages = {
     "game.nextNote": "PROCHAINE NOTE",
   },
   en: {
+    "doc.title": "WebHero — Documentation",
+    "doc.metaDescription":
+      "WebHero guide: import a chart, play with a keyboard, controller, or touchscreen, and adjust the game.",
+    "doc.socialDescription": "WebHero gameplay guide and help.",
+    "doc.brandLabel": "WebHero, back to the game",
+    "doc.contentsLabel": "Contents",
+    "doc.skip": "Skip to documentation",
+    "doc.brandKicker": "Player guide",
+    "doc.return":
+      '<i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Back to game',
+    "doc.contents": `<p class="doc-toc-title">In this guide</p>
+            <a href="#prise-en-main">Getting started</a>
+            <a href="#jouer">Hit a note</a>
+            <a href="#commandes">Controls</a>
+            <a href="#options">Game options</a>
+            <a href="#resultats">Pause and results</a>
+            <a href="#fonctionnement">Data and how it works</a>
+            <a href="#depannage">Troubleshooting</a>`,
+    "doc.article": `<header class="doc-intro">
+              <p class="doc-eyebrow">PLAYER GUIDE</p>
+              <h1>How to play WebHero</h1>
+              <p>Import your own chart, choose your controls, and play along with the music. WebHero runs in your browser and supports keyboard, controller, and touchscreen play.</p>
+              <p class="doc-quickline"><span>5 lanes</span><span>.chart and MIDI charts</span><span>Local audio</span></p>
+            </header>
+
+            <section id="prise-en-main" class="doc-section">
+              <div class="doc-section-heading">
+                <span class="doc-section-number">01</span>
+                <h2>Getting started</h2>
+              </div>
+              <ol class="doc-steps">
+                <li><strong>Import a song.</strong> Choose <em>Import folder</em> or the ZIP button. A folder or archive must contain a single chart in <code>.chart</code>, <code>.mid</code>, or <code>.midi</code> format. Files named <code>notes.chart</code> or <code>notes.mid</code> are detected automatically.</li>
+                <li><strong>Optionally add the music.</strong> Put audio tracks in the same folder as the chart. A <code>song.ini</code> file can provide the title and artist. Audio is optional; the chart can still be played silently.</li>
+                <li><strong>Choose a difficulty.</strong> The menu only lists difficulties found in the chart. If your saved difficulty is unavailable, the closest available one is selected.</li>
+                <li><strong>Press Play.</strong> Importing and decoding audio can take a moment; a progress indicator appears while files are loading.</li>
+              </ol>
+              <aside class="doc-callout"><strong>One thing to remember</strong><span>If a ZIP contains several songs, import the ZIP for the song you want or select that song's folder directly. Do not select the parent folder of a song pack.</span></aside>
+              <p>Supported audio extensions are <code>.aac</code>, <code>.flac</code>, <code>.m4a</code>, <code>.mp3</code>, <code>.ogg</code>, <code>.opus</code>, and <code>.wav</code>. Playback also depends on which formats your browser can decode.</p>
+              <p>Find charts to play at <a class="doc-inline-link" href="https://enchor.us/" target="_blank" rel="noopener noreferrer">enchor.us</a>. YARG and Clone Hero song folders can be imported if they contain a supported five-lane guitar chart in <code>.chart</code>, <code>.mid</code>, or <code>.midi</code> format. Import one song folder at a time, not an entire pack.</p>
+            </section>
+
+            <section id="jouer" class="doc-section">
+              <div class="doc-section-heading">
+                <span class="doc-section-number">02</span>
+                <h2>Hit a note</h2>
+              </div>
+              <p>Notes travel down five lanes. Press the control for a lane when its note reaches the hit line. For a chord, press every indicated lane at the same time. Hold the control for the full length of a sustain note.</p>
+              <p>By default, the five keyboard controls are <kbd>D</kbd>, <kbd>F</kbd>, <kbd>J</kbd>, <kbd>K</kbd>, and <kbd>L</kbd>, from left to right. The colored markers below the game show which key matches each lane. You can change each key in the <em>Keyboard</em> panel.</p>
+              <div class="doc-rule-list">
+                <p><strong>Regular notes</strong><span>On keyboard or touchscreen, press the lane. In guitar mode, strum while holding the matching fret or frets.</span></p>
+                <p><strong>HOPO</strong><span>A HOPO note can be hit by pressing its fret without strumming when the combo chain allows it.</span></p>
+                <p><strong>TAP</strong><span>Hit a TAP note by pressing its fret; no strum or existing combo chain is required.</span></p>
+                <p><strong>Sustain</strong><span>Keep the fret, key, or finger held until the note ends to keep earning points.</span></p>
+              </div>
+            </section>
+
+            <section id="commandes" class="doc-section">
+              <div class="doc-section-heading">
+                <span class="doc-section-number">03</span>
+                <h2>Controls</h2>
+              </div>
+              <div class="doc-table-wrap">
+                <table>
+                  <thead><tr><th>Action</th><th>Default</th><th>Notes</th></tr></thead>
+                  <tbody>
+                    <tr><th scope="row">Lanes</th><td><kbd>D</kbd> <kbd>F</kbd> <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd></td><td>Each key can be changed in the Keyboard panel.</td></tr>
+                    <tr><th scope="row">Pause</th><td><kbd>Esc</kbd> or START</td><td>A touchscreen Pause button is also available.</td></tr>
+                    <tr><th scope="row">Star Power</th><td><kbd>Space</kbd></td><td>The key and controller button can be remapped.</td></tr>
+                    <tr><th scope="row">Guitar strum</th><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Used in guitar mode; either direction can strum.</td></tr>
+                    <tr><th scope="row">Touchscreen</th><td>Tap a note</td><td>Tap a lane at the hit line; multiple fingers can hold sustains.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <h3>Controller</h3>
+              <p>Connect a compatible controller before playing. In the <em>Controller</em> panel, click a control and press the button you want to assign; the new mapping is saved in this browser. Detected buttons and axes are shown in the panel.</p>
+              <p>When a controller is connected, the game switches to guitar mode: lanes act as frets and regular notes require a strum unless <em>Auto strum</em> is enabled. Keyboard lane keys can also be used as frets.</p>
+              <h3>Auto strum and fret hierarchy</h3>
+              <p>The <em>Auto strum</em> option only appears when a controller is detected. When enabled, it strums notes and chords at the right time as long as the correct frets are held; you do not need to press a new fret for every note.</p>
+              <p>For a chord, every lane in the chord must be held, and the highest fret must match the target. Lower frets may stay held; an incorrect higher fret or a missing chord lane prevents the hit. HOPO and TAP notes can still be hit by fretting.</p>
+            </section>
+
+            <section id="options" class="doc-section">
+              <div class="doc-section-heading">
+                <span class="doc-section-number">04</span>
+                <h2>Game options</h2>
+              </div>
+              <dl class="doc-definitions">
+                <div><dt>Speed</dt><dd>Adjusts song playback from 50% to 100% (75% by default).</dd></div>
+                <div><dt>Hyperspeed</dt><dd>Changes note scroll speed from 0.8× to 2.5× (1.5× by default) without speeding up the music.</dd></div>
+                <div><dt>Note size</dt><dd>Changes note size from 50% to 150%; it does not affect timing or the hit line.</dd></div>
+                <div><dt>Practice</dt><dd>Choose a start and end section from the chart, then repeat that passage. Star Power is disabled in Practice.</dd></div>
+                <div><dt>No-Fail Mode</dt><dd>Prevents the game from ending because of stage presence. The score for that run is not recorded.</dd></div>
+                <div><dt>Audio delay</dt><dd>Offsets the music from −300 to +300 ms. A negative value plays it earlier; use this if the audio is late.</dd></div>
+                <div><dt>Video delay</dt><dd>Offsets the notes from −300 to +300 ms. A positive value displays them earlier if the screen is delayed.</dd></div>
+                <div><dt>Hit-zone preview</dt><dd>Shows the calibrated hit zone to help adjust the delays.</dd></div>
+              </dl>
+              <h3>Star Power</h3>
+              <p>Hit every note in a star phrase to add 25% to the meter. At 50% or more, activate Star Power with its assigned key or button: the score multiplier doubles for 8 seconds. Star phrases and Star Power are disabled in Practice.</p>
+              <h3>Customization</h3>
+              <p>The <em>Custom</em> panel lets you choose the main color and an image for the highway background. The image is stored locally; choose <em>Remove image</em> to restore the default background.</p>
+              <h3>Display and language</h3>
+              <p>The <em>Fullscreen</em> button is at the top of the game page. The FR/EN toggle changes the game interface language and remembers your choice in this browser.</p>
+            </section>
+
+            <section id="resultats" class="doc-section">
+              <div class="doc-section-heading">
+                <span class="doc-section-number">05</span>
+                <h2>Pause and results</h2>
+              </div>
+              <p>Pausing stops the music. Resuming syncs the music and timeline with a three-second rewind. In Practice, the pause menu also lets you restart the section; doing so resets that passage's stats.</p>
+              <p>At the end of a chart, after stopping, or after a game over, the summary shows score, accuracy, duration, note count, hits and misses, average timing, and best streak. A negative timing means you hit early; a positive timing means you hit late. You can replay or return to the game screen.</p>
+            </section>
+
+            <section id="fonctionnement" class="doc-section">
+              <div class="doc-section-heading">
+                <span class="doc-section-number">06</span>
+                <h2>Data and how it works</h2>
+              </div>
+              <p>Your browser reads the chart, prepares the note timeline, decodes the audio tracks, and keeps them synchronized during play. The canvas draws the highway, notes, and HUD as the game runs.</p>
+              <p>Imported files stay on your device: charts and audio tracks are not uploaded to the server. WebHero stores settings, language, and the most recently imported chart locally; associated audio files are kept in the browser cache so they can be restored the next time you load the page.</p>
+              <p><em>Unload chart</em> removes the current chart, its local save, and its audio cache. Clearing this site's browser data also removes saved settings and files.</p>
+            </section>
+
+            <section id="depannage" class="doc-section">
+              <div class="doc-section-heading">
+                <span class="doc-section-number">07</span>
+                <h2>Troubleshooting</h2>
+              </div>
+              <div class="doc-rule-list">
+                <p><strong>No difficulty appears</strong><span>Make sure a chart is loaded and contains a difficulty with a five-lane guitar track.</span></p>
+                <p><strong>The folder is rejected</strong><span>Import one song folder, not the parent folder of several songs; check for a .chart, .mid, or .midi file.</span></p>
+                <p><strong>There is no music</strong><span>Check that audio files are in the same folder as the chart and that your browser can decode them. Then adjust the audio delay if the sound is out of sync.</span></p>
+                <p><strong>The controller is not detected</strong><span>Reconnect it, check that the browser recognizes it, then press a button to activate it.</span></p>
+                            <p><strong>A guitar controller is not detected</strong><span>Some models may require a compatible USB adapter or wireless receiver to connect to the computer. Check that the operating system recognizes the guitar before launching WebHero.</span></p>
+              </div>
+              <p class="doc-endnote">To play, return to the game using the button at the top of this page.</p>
+            </section>`,
     "meta.title": "WebHero — free rhythm game",
     "meta.description":
       "Play WebHero, a free rhythm game inspired by Guitar Hero. Load a chart, choose a difficulty, and play with a keyboard or touchscreen.",
@@ -312,6 +457,7 @@ const messages = {
     "settings.noFailTitle":
       "No stage presence or game over; score is not submitted",
     "settings.noFail": "No-Fail Mode",
+    "settings.autoStrum": "Auto strum",
     "settings.practice": "Practice",
     "settings.start": "Start",
     "settings.end": "End",
@@ -546,7 +692,13 @@ export function t(key, values = {}) {
 
 function translateElement(element) {
   const values = dynamicValues.get(element) || {};
-  if (element.dataset.i18n)
+  if (element.dataset.i18nHtml) {
+    if (!originalI18nHtml.has(element))
+      originalI18nHtml.set(element, element.innerHTML);
+    element.innerHTML =
+      messages[language][element.dataset.i18nHtml] ??
+      originalI18nHtml.get(element);
+  } else if (element.dataset.i18n)
     element.textContent = t(element.dataset.i18n, values);
   for (const item of (element.dataset.i18nAttrs || "").split(";")) {
     if (!item) continue;
@@ -564,7 +716,7 @@ export function setI18nText(element, key, values = {}) {
 export function applyI18n(root = document) {
   document.documentElement.lang = language;
   root
-    .querySelectorAll("[data-i18n], [data-i18n-attrs]")
+    .querySelectorAll("[data-i18n], [data-i18n-html], [data-i18n-attrs]")
     .forEach(translateElement);
   document.querySelectorAll("[data-language]").forEach((button) => {
     button.setAttribute(

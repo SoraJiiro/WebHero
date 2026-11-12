@@ -170,6 +170,7 @@ export function initWebHero(socket = null) {
   );
   const quitButton = document.getElementById("web-hero-quit");
   const noFailInput = document.getElementById("web-hero-nofail");
+  const autoStrumInput = document.getElementById("web-hero-auto-strum");
   document.addEventListener("webhero:languagechange", () =>
     draw(performance.now()),
   );
@@ -309,6 +310,7 @@ export function initWebHero(socket = null) {
   state.travelTime =
     DIFFICULTIES[state.difficulty].travelTime / Number(hyperspeedInput.value);
   noFailInput.checked = savedSettings.noFail === true;
+  autoStrumInput.checked = savedSettings.autoStrum === true;
   practiceInput.checked = savedSettings.practiceMode === true;
   hitZonePreviewInput.checked = savedSettings.hitZonePreview === true;
   state.hitZonePreview = hitZonePreviewInput.checked;
@@ -325,6 +327,7 @@ export function initWebHero(socket = null) {
           audioDelay: Number(audioDelayInput.value),
           videoDelay: Number(videoDelayInput.value),
           noFail: noFailInput.checked,
+          autoStrum: autoStrumInput.checked,
           practiceMode: practiceInput.checked,
           hitZonePreview: hitZonePreviewInput.checked,
           primaryColor: state.primaryColor,
@@ -350,6 +353,7 @@ export function initWebHero(socket = null) {
     audioDelayInput.disabled = disabled;
     videoDelayInput.disabled = disabled;
     noFailInput.disabled = disabled;
+    autoStrumInput.disabled = disabled;
     practiceInput.disabled = disabled;
     practiceStartSectionSelect.disabled = disabled || !practiceInput.checked;
     practiceEndSectionSelect.disabled = disabled || !practiceInput.checked;
@@ -1480,20 +1484,21 @@ export function initWebHero(socket = null) {
 
   // HOPO (chaîne en cours) et TAP : validés par une frette pressée, sans strum.
   function tryFretHit(now) {
-    if (
-      !state.running ||
-      state.paused ||
-      state.ending ||
-      state.lastFretAt <= state.lastHitAt
-    )
-      return;
+    if (!state.running || state.paused || state.ending) return;
     const group = findGuitarGroup(state.notes, now);
+    if (!group || !fretsMatch(group.lanes, getHeldLanes())) return;
     if (
-      group &&
-      canFretHit(group.type, state.combo) &&
-      fretsMatch(group.lanes, getHeldLanes())
-    )
+      state.lastFretAt > state.lastHitAt &&
+      canFretHit(group.type, state.combo)
+    ) {
       hitGuitarGroup(group, now);
+    } else if (
+      autoStrumInput.checked &&
+      group.notes.every((note) => now >= note.hitAt)
+    ) {
+      logAction("input.strum", { auto: true });
+      hitGuitarGroup(group, now);
+    }
   }
 
   function fretDown() {
@@ -1646,6 +1651,10 @@ export function initWebHero(socket = null) {
   );
   noFailInput.addEventListener("change", () => {
     logAction("setting.no-fail", { enabled: noFailInput.checked });
+    saveSettings();
+  });
+  autoStrumInput.addEventListener("change", () => {
+    logAction("setting.auto-strum", { enabled: autoStrumInput.checked });
     saveSettings();
   });
   returnButton?.addEventListener("click", () => {
@@ -2150,7 +2159,8 @@ export function initWebHero(socket = null) {
   const padWasDown = new Set();
   function pollPads() {
     const pads = navigator.getGamepads?.() ?? [];
-    guitarMode = pads.some(Boolean);
+    guitarMode = pads.some((pad) => pad?.connected);
+    autoStrumInput.closest(".speed-control").hidden = !guitarMode;
     const down = getPressedPadButtons(pads);
     const axes = (pickPad(pads)?.axes ?? []).flatMap((v, i) =>
       Math.abs(v) > 0.5 ? [`A${i}`] : [],

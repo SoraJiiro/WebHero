@@ -88,7 +88,8 @@
                 aria-label="Importer une archive ZIP de chart"
                 title="Importer une archive ZIP de chart"
                 data-i18n-attrs="aria-label:chart.importZipAria;title:chart.importZipTitle"><i
-                  class="fa-solid fa-file-zipper" aria-hidden="true"></i></button>
+                  class="fa-solid fa-file-zipper"
+                  aria-hidden="true"></i></button>
             </div>
           </div>
           <label class="field difficulty-field">
@@ -343,6 +344,12 @@
                 <span><i class="fa-solid fa-shield-halved"
                     aria-hidden="true"></i>
                   <span data-i18n="settings.noFail">No-Fail Mode</span></span>
+              </label>
+              <label class="speed-control nofail" hidden>
+                <input id="web-hero-auto-strum" type="checkbox" />
+                <span><i class="fa-solid fa-guitar"
+                    aria-hidden="true"></i>
+                  <span data-i18n="settings.autoStrum">Auto strum</span></span>
               </label>
               <label class="speed-control nofail">
                 <input id="web-hero-practice" type="checkbox" />
@@ -621,7 +628,8 @@
           data-i18n-attrs="aria-label:file.chart;title:file.chartTitle"
           accept=".chart,.mid,.midi,.ini,.aac,.flac,.m4a,.mp3,.ogg,.opus,.wav"
           webkitdirectory directory multiple hidden />
-        <input id="web-hero-chart-zip-file" type="file" accept=".zip,application/zip"
+        <input id="web-hero-chart-zip-file" type="file"
+          accept=".zip,application/zip"
           aria-label="Sélectionner une archive ZIP de chart"
           data-i18n-attrs="aria-label:chart.importZipAria" hidden />
       </footer>
