@@ -20,379 +20,397 @@
         <meta name="twitter:card" content="summary" />
         <link rel="icon" type="image/svg+xml"
             href="./assets/imgs/WH-LOGO.svg" />
-        <title data-i18n-html="doc.title">WebHero — Documentation</title>
+        <title data-i18n="doc.title">WebHero — Documentation</title>
+        <script>
+            try {
+                const settings = JSON.parse(localStorage.getItem("web-hero-settings") || "{}");
+                if (/^#[\da-f]{6}$/i.test(settings.primaryColor || ""))
+                    document.documentElement.style.setProperty("--accent", settings.primaryColor);
+            } catch {}
+        </script>
         <link rel="stylesheet" href="./css/styles.css" />
         <script src="./js/anx.js" defer></script>
     </head>
     <body>
-        <a class="skip-link" href="#doc-main" data-i18n-html="doc.skip">Passer à
+        <a class="skip-link" href="#doc-main" data-i18n="doc.skip">Passer à
             la documentation</a>
+        <div class="doc-scroll-progress" role="progressbar" aria-valuemin="0"
+            aria-valuemax="100" aria-valuenow="0"
+            aria-label="Progression de lecture"
+            data-i18n-attrs="aria-label:doc.scrollProgress"><span></span></div>
         <div class="doc-shell">
             <header class="topbar doc-topbar">
                 <a class="doc-brand" href="./index.html"
                     aria-label="WebHero, retour au jeu"
                     data-i18n-attrs="aria-label:doc.brandLabel">
-                    <img src="./assets/imgs/WH-LOGO.svg" alt />
+                    <img src="./assets/imgs/WH-LOGO.svg" alt="WebHero logo" />
                     <span>
                         <span class="brand-kicker"
-                            data-i18n-html="doc.brandKicker">Guide
+                            data-i18n="doc.brandKicker">Guide
                             d’utilisation</span>
                         <span class="doc-brand-name">WEB<span>HERO</span></span>
                     </span>
                 </a>
                 <div class="doc-header-actions">
-                    <div class="doc-language">
-                        <span class="doc-language-label"
-                            data-i18n="nav.language">Langue du jeu</span>
+                    <div class="toolbar-action language-action">
+                        <span><i class="fa-solid fa-language"
+                                aria-hidden="true"></i>
+                            <span data-i18n="nav.language">Langue</span></span>
                         <div class="language-toggle" role="group"
-                            aria-label="Langue de l’interface du jeu"
+                            aria-label="Langue"
                             data-i18n-attrs="aria-label:nav.language">
                             <button type="button" data-language="fr"
                                 aria-pressed="true" aria-label="Français"
                                 data-i18n-attrs="aria-label:language.fr">FR</button>
                             <button type="button" data-language="en"
-                                aria-pressed="false" aria-label="English"
+                                aria-pressed="false" aria-label="Anglais"
                                 data-i18n-attrs="aria-label:language.en">EN</button>
                         </div>
                     </div>
-                    <a class="doc-game-link" href="./index.html"
-                        data-i18n-html="doc.return"><i
+                    <a class="doc-game-link" href="./index.html"><i
                             class="fa-solid fa-arrow-left"
-                            aria-hidden="true"></i> Retour au jeu</a>
+                            aria-hidden="true"></i> <span
+                            data-i18n="doc.return">Retour au jeu</span></a>
                 </div>
             </header>
 
             <main id="doc-main" class="doc-main" tabindex="-1">
                 <nav class="doc-toc" aria-label="Sommaire"
-                    data-i18n-attrs="aria-label:doc.contentsLabel"
-                    data-i18n-html="doc.contents">
-                    <p class="doc-toc-title">Dans ce guide</p>
-                    <a href="#prise-en-main">Prise en main</a>
-                    <a href="#jouer">Jouer une note</a>
-                    <a href="#commandes">Commandes</a>
-                    <a href="#options">Options de jeu</a>
-                    <a href="#resultats">Pause et résultats</a>
-                    <a href="#fonctionnement">Données et fonctionnement</a>
-                    <a href="#depannage">Dépannage</a>
+                    data-i18n-attrs="aria-label:doc.contentsLabel">
+                    <p class="doc-toc-title"
+                        data-i18n="doc.tocTitle">Sommaire</p>
+                    <a href="#prise-en-main" data-i18n="doc.tocStart">Prise en
+                        main</a>
+                    <a href="#jouer" data-i18n="doc.tocPlay">Jouer une note</a>
+                    <a href="#score" data-i18n="doc.tocScore">Score et Star
+                        Power</a>
+                    <a href="#commandes"
+                        data-i18n="doc.tocControls">Commandes</a>
+                    <a href="#options" data-i18n="doc.tocOptions">Options de
+                        jeu</a>
+                    <a href="#resultats" data-i18n="doc.tocResults">Pause et
+                        résultats</a>
+                    <a href="#fonctionnement"
+                        data-i18n="doc.tocData">Données</a>
+                    <a href="#depannage"
+                        data-i18n="doc.tocTroubleshooting">Dépannage</a>
                 </nav>
 
-                <article class="doc-article" data-i18n-html="doc.article">
+                <article class="doc-article">
                     <header class="doc-intro">
-                        <p class="doc-eyebrow">MODE D’EMPLOI</p>
-                        <h1>Jouer à WebHero</h1>
-                        <p>Importe ta propre chart, choisis tes commandes et
-                            joue au rythme de la musique. WebHero fonctionne
-                            dans le navigateur, au clavier, à la manette ou sur
+                        <p class="doc-eyebrow" data-i18n="doc.eyebrow">MODE
+                            D’EMPLOI</p>
+                        <h1 data-i18n="doc.heading">Jouer à WebHero</h1>
+                        <p data-i18n="doc.intro">Importe une chanson, choisis
+                            tes commandes et joue au rythme de la musique.
+                            WebHero fonctionne au clavier, à la manette ou sur
                             écran tactile.</p>
-                        <p class="doc-quickline"><span>5
-                                lanes</span><span>Charts .chart et
-                                MIDI</span><span>Audio local</span></p>
                     </header>
 
                     <section id="prise-en-main" class="doc-section">
-                        <div class="doc-section-heading">
-                            <span class="doc-section-number">01</span>
-                            <h2>Prise en main</h2>
-                        </div>
+                        <div class="doc-section-heading"><span
+                                class="doc-section-number">01</span><h2
+                                data-i18n="doc.startHeading">Prise en
+                                main</h2></div>
                         <ol class="doc-steps">
-                            <li><strong>Importe une chanson.</strong> Choisis
-                                <em>Importer un dossier</em> ou le bouton ZIP.
-                                Un dossier ou une archive doit contenir une
-                                seule chart au format <code>.chart</code>,
-                                <code>.mid</code> ou <code>.midi</code>. Les
-                                fichiers <code>notes.chart</code> et
-                                <code>notes.mid</code> sont détectés
-                                automatiquement.</li>
-                            <li><strong>Ajoute éventuellement la
-                                    musique.</strong> Place les pistes audio
-                                dans le même dossier que la chart. Un fichier
-                                <code>song.ini</code> peut fournir le titre et
-                                l’artiste. L’audio est facultatif: sans piste,
-                                la partie reste jouable en silence.</li>
-                            <li><strong>Choisis une difficulté.</strong> Le menu
-                                ne propose que celles présentes dans la chart.
-                                La difficulté la plus proche est choisie si
-                                celle mémorisée n’existe pas pour cette
-                                chanson.</li>
-                            <li><strong>Appuie sur Jouer.</strong> Le chargement
-                                et le décodage des pistes peuvent prendre
-                                quelques instants; une progression apparaît
-                                pendant l’import.</li>
+                            <li><strong data-i18n="doc.startImportLead">Importe
+                                    une chanson.</strong> <span
+                                    data-i18n="doc.startImportText">Choisis un
+                                    dossier ou un ZIP contenant une seule chart
+                                    guitare.</span></li>
+                            <li><strong data-i18n="doc.startMusicLead">Ajoute la
+                                    musique si tu veux.</strong> <span
+                                    data-i18n="doc.startMusicText">Place les
+                                    fichiers audio avec la chart. Tu peux aussi
+                                    jouer sans musique.</span></li>
+                            <li><strong
+                                    data-i18n="doc.startDifficultyLead">Choisis
+                                    une difficulté</strong> <span
+                                    data-i18n="doc.startDifficultyText">parmi
+                                    celles proposées pour cette
+                                    chanson.</span></li>
+                            <li><strong data-i18n="doc.startPlayLead">Appuie sur
+                                    Jouer.</strong> <span
+                                    data-i18n="doc.startPlayText">Patiente
+                                    pendant l’importation.</span></li>
                         </ol>
-                        <aside class="doc-callout"><strong>À
-                                retenir</strong><span>Si ton ZIP regroupe
-                                plusieurs chansons, importe le ZIP de la chanson
-                                voulue ou sélectionne directement son dossier.
-                                Ne choisis pas le dossier parent d’un
-                                lot.</span></aside>
-                        <p>Formats audio reconnus par l’import:
-                            <code>.aac</code>, <code>.flac</code>,
-                            <code>.m4a</code>, <code>.mp3</code>,
-                            <code>.ogg</code>, <code>.opus</code> et
-                            <code>.wav</code>. La lecture dépend aussi des
-                            formats décodés par ton navigateur.</p>
-                        <p>Pour trouver des charts à jouer, tu peux consulter <a
+                        <aside class="doc-callout"><strong
+                                data-i18n="doc.startTipTitle">Une chanson à la
+                                fois</strong><span data-i18n="doc.startTip">Si
+                                un ZIP contient plusieurs chansons, choisis le
+                                ZIP ou le dossier de celle que tu veux, pas le
+                                dossier qui les regroupe.</span></aside>
+                        <p><span data-i18n="doc.findSongsBefore">Pour trouver
+                                des chansons, consulte </span><a
                                 class="doc-inline-link"
                                 href="https://enchor.us/" target="_blank"
-                                rel="noopener noreferrer">enchor.us</a>. Les
-                            dossiers de chansons YARG et Clone Hero peuvent être
-                            importés ici s’ils contiennent une chart guitare
-                            cinq lanes reconnue au format <code>.chart</code>,
-                            <code>.mid</code> ou <code>.midi</code>. Importe le
-                            dossier d’une seule chanson, pas un lot complet.</p>
+                                rel="noopener noreferrer">enchor.us</a><span
+                                data-i18n="doc.findSongsAfter">. Les chansons de
+                                YARG et Clone Hero peuvent aussi être
+                                importées.</span></p>
                     </section>
 
                     <section id="jouer" class="doc-section">
-                        <div class="doc-section-heading">
-                            <span class="doc-section-number">02</span>
-                            <h2>Jouer une note</h2>
-                        </div>
-                        <p>Les notes descendent sur cinq lanes. Appuie sur la
-                            commande correspondant à la lane lorsque la note
-                            atteint la ligne de frappe. Pour un accord, active
-                            toutes les lanes indiquées au même moment. Maintiens
-                            la commande pendant toute la durée d’une note
-                            longue.</p>
-                        <p>Au clavier, les cinq commandes par défaut sont
-                            <kbd>D</kbd>, <kbd>F</kbd>, <kbd>J</kbd>,
-                            <kbd>K</kbd> et <kbd>L</kbd>, de gauche à droite.
-                            Les repères colorés sous le jeu montrent leur
-                            correspondance. Tu peux modifier chaque touche dans
-                            le panneau <em>Clavier</em>.</p>
+                        <div class="doc-section-heading"><span
+                                class="doc-section-number">02</span><h2
+                                data-i18n="doc.playHeading">Jouer une
+                                note</h2></div>
+                        <p data-i18n="doc.playBasics">Appuie sur la lane quand
+                            la note atteint la ligne de frappe. Pour un accord,
+                            active toutes ses lanes en même temps. Maintiens la
+                            commande pendant les notes longues.</p>
+                        <p><span data-i18n="doc.playKeysBefore">Les touches par
+                                défaut sont </span><kbd>D</kbd>, <kbd>F</kbd>,
+                            <kbd>J</kbd>, <kbd>K</kbd> <span
+                                data-i18n="doc.playKeysAnd">et</span>
+                            <kbd>L</kbd><span data-i18n="doc.playKeysAfter">. Tu
+                                peux les modifier dans le panneau
+                                Clavier.</span></p>
                         <div class="doc-rule-list">
-                            <p><strong>Notes normales</strong><span>Au clavier
-                                    ou au tactile, frappe la lane. En mode
-                                    guitare, utilise le strum avec la ou les
-                                    frettes correspondantes.</span></p>
-                            <p><strong>HOPO</strong><span>Une note HOPO peut
-                                    être jouée en appuyant sur sa frette sans
-                                    strum lorsque la chaîne de combo le
-                                    permet.</span></p>
-                            <p><strong>TAP</strong><span>Une note TAP se joue en
-                                    appuyant sur sa frette, sans strum ni chaîne
-                                    préalable.</span></p>
-                            <p><strong>Sustain</strong><span>Garde la frette, la
-                                    touche ou le doigt enfoncé jusqu’à la fin de
-                                    la note pour continuer à marquer des
-                                    points.</span></p>
+                            <p><strong class="doc-note-name"><span
+                                        class="doc-note-icon doc-note-icon--normal"
+                                        aria-hidden="true"></span><span
+                                        data-i18n="doc.normalTitle">Note
+                                        normale</span></strong><span
+                                    data-i18n="doc.normalText">Appuie sur la
+                                    lane au moment où la note atteint la ligne
+                                    de frappe.</span></p>
+                            <p><strong class="doc-note-name"><span
+                                        class="doc-note-icon doc-note-icon--hopo"
+                                        aria-hidden="true"></span><span
+                                        data-i18n="doc.hopoTitle">HOPO</span></strong><span
+                                    data-i18n="doc.hopoText">Appuie sur la
+                                    frette correspondante sans strum lorsque le
+                                    combo le permet.</span></p>
+                            <p><strong class="doc-note-name"><span
+                                        class="doc-note-icon doc-note-icon--tap"
+                                        aria-hidden="true"></span><span
+                                        data-i18n="doc.tapTitle">TAP</span></strong><span
+                                    data-i18n="doc.tapText">Appuie sur la frette
+                                    correspondante; aucun strum ni combo n’est
+                                    nécessaire.</span></p>
+                        </div>
+                        <p class="doc-endnote" data-i18n="doc.sustainHint">Quel
+                            que soit son type, si une note a une traînée,
+                            maintiens la frette jusqu’à son extrémité.</p>
+                    </section>
+
+                    <section id="score" class="doc-section">
+                        <div class="doc-section-heading"><span
+                                class="doc-section-number">03</span><h2
+                                data-i18n="doc.scoreHeading">Score et
+                                multiplicateur</h2></div>
+                        <p data-i18n="doc.scoreBasics">Chaque note réussie
+                            rapporte des points. Le multiplicateur augmente avec
+                            ta série: x2 après 10 notes, x3 après 20 et x4 après
+                            30. Un miss remet la série et le multiplicateur à
+                            zéro.</p>
+                        <h3 data-i18n="doc.starPowerHeading">Star Power</h3>
+                        <div class="doc-rule-list">
+                            <p><strong class="doc-note-name"><span
+                                        class="doc-note-icon doc-note-icon--star-phrase"
+                                        aria-hidden="true"></span><span
+                                        data-i18n="doc.starPhraseTitle">Notes
+                                        étoilées</span></strong><span
+                                    data-i18n="doc.starPhraseText">Elles
+                                    apparaissent en forme d’étoile. Réussis
+                                    toutes les notes de la phrase pour remplir
+                                    la jauge de 25 %.</span></p>
+                            <p><strong class="doc-note-name"><span
+                                        class="doc-note-icon doc-note-icon--star-active"
+                                        aria-hidden="true"></span><span
+                                        data-i18n="doc.starActiveTitle">Star
+                                        Power activé</span></strong><span
+                                    data-i18n="doc.starActiveText">À 50 % de
+                                    jauge, active-le avec Espace ou le bouton
+                                    assigné. Pendant 8 secondes, tes points sont
+                                    doublés et les notes prennent une apparence
+                                    cyan. Indisponible en Practice.</span></p>
                         </div>
                     </section>
 
                     <section id="commandes" class="doc-section">
-                        <div class="doc-section-heading">
-                            <span class="doc-section-number">03</span>
-                            <h2>Commandes</h2>
-                        </div>
-                        <div class="doc-table-wrap">
-                            <table>
-                                <thead><tr><th>Action</th><th>Par
-                                            défaut</th><th>À
+                        <div class="doc-section-heading"><span
+                                class="doc-section-number">04</span><h2
+                                data-i18n="doc.controlsHeading">Commandes</h2></div>
+                        <div class="doc-table-wrap"><table>
+                                <thead><tr><th
+                                            data-i18n="doc.tableAction">Action</th><th
+                                            data-i18n="doc.tableDefault">Par
+                                            défaut</th><th
+                                            data-i18n="doc.tableTip">À
                                             savoir</th></tr></thead>
                                 <tbody>
-                                    <tr><th
-                                            scope="row">Lanes</th><td><kbd>D</kbd>
+                                    <tr><th scope="row"
+                                            data-i18n="doc.lanes">Lanes</th><td><kbd>D</kbd>
                                             <kbd>F</kbd> <kbd>J</kbd>
-                                            <kbd>K</kbd>
-                                            <kbd>L</kbd></td><td>Chaque touche
-                                            se reconfigure dans le panneau
-                                            Clavier.</td></tr>
-                                    <tr><th
-                                            scope="row">Pause</th><td><kbd>Échap</kbd>
-                                            ou START</td><td>Le bouton tactile
-                                            Pause est également
+                                            <kbd>K</kbd> <kbd>L</kbd></td><td
+                                            data-i18n="doc.lanesTip">Modifie-les
+                                            dans le panneau Clavier.</td></tr>
+                                    <tr><th scope="row"
+                                            data-i18n="doc.pause">Pause</th><td><kbd>Échap</kbd>
+                                            / START</td><td
+                                            data-i18n="doc.pauseTip">Un bouton
+                                            tactile est aussi
                                             disponible.</td></tr>
                                     <tr><th scope="row">Star
-                                            Power</th><td><kbd>Espace</kbd></td><td>La
-                                            touche et le bouton de manette sont
-                                            reconfigurables.</td></tr>
-                                    <tr><th scope="row">Strum
+                                            Power</th><td><kbd>Espace</kbd></td><td
+                                            data-i18n="doc.starPowerTip">La
+                                            touche peut être modifiée.</td></tr>
+                                    <tr><th scope="row"
+                                            data-i18n="doc.strum">Strum
                                             guitare</th><td><kbd>↑</kbd> /
-                                            <kbd>↓</kbd></td><td>Utilisés en
-                                            mode guitare; les deux directions
-                                            peuvent strummer.</td></tr>
-                                    <tr><th scope="row">Écran
-                                            tactile</th><td>Toucher une
-                                            note</td><td>Touche la lane sur la
-                                            ligne de frappe; plusieurs doigts
-                                            peuvent tenir des
-                                            sustains.</td></tr>
+                                            <kbd>↓</kbd></td><td
+                                            data-i18n="doc.strumTip">À utiliser
+                                            avec les frettes
+                                            correspondantes.</td></tr>
+                                    <tr><th scope="row"
+                                            data-i18n="doc.touch">Écran
+                                            tactile</th><td
+                                            data-i18n="doc.touchDefault">Toucher
+                                            une lane</td><td
+                                            data-i18n="doc.touchTip">Maintiens
+                                            le doigt pour les notes
+                                            longues.</td></tr>
                                 </tbody>
-                            </table>
-                        </div>
-                        <h3>Manette</h3>
-                        <p>Connecte une manette compatible avant de jouer. Dans
-                            le panneau <em>Manette</em>, clique sur une commande
-                            puis appuie sur le bouton souhaité; la nouvelle
-                            affectation est mémorisée dans ce navigateur. Les
-                            boutons détectés et les axes sont affichés dans le
-                            panneau.</p>
-                        <p>Lorsqu’une manette est connectée, le jeu passe en
-                            mode guitare: les lanes correspondent aux frettes et
-                            les notes normales demandent un strum, sauf si
-                            l’option <em>Auto strum</em> est activée. Les
-                            touches de lanes du clavier peuvent alors servir de
-                            frettes.</p>
-                        <h3>Auto strum et hiérarchie des frettes</h3>
-                        <p>L’option <em>Auto strum</em> n’apparaît que
-                            lorsqu’une manette est détectée. Activée, elle
-                            strumme les notes et accords au moment prévu tant
-                            que les bonnes frettes sont maintenues; il n’est pas
-                            nécessaire de presser une nouvelle frette pour
-                            chaque note.</p>
-                        <p>Pour un accord, toutes ses lanes doivent être tenues
-                            et la frette la plus haute doit correspondre à la
-                            note visée. Des frettes plus basses peuvent rester
-                            maintenues; une frette plus haute incorrecte ou une
-                            lane manquante empêche le hit. Les notes HOPO et TAP
-                            gardent aussi leur validation par frette.</p>
+                            </table></div>
+                        <h3 data-i18n="doc.controllerHeading">Manette</h3>
+                        <p data-i18n="doc.controllerText">Connecte une manette
+                            et associe ses boutons dans le panneau Manette. En
+                            mode guitare, joue les notes avec les frettes
+                            correspondantes et le strum. Auto strum peut s’en
+                            charger à ta place.</p>
                     </section>
 
                     <section id="options" class="doc-section">
-                        <div class="doc-section-heading">
-                            <span class="doc-section-number">04</span>
-                            <h2>Options de jeu</h2>
-                        </div>
+                        <div class="doc-section-heading"><span
+                                class="doc-section-number">05</span><h2
+                                data-i18n="doc.optionsHeading">Options de
+                                jeu</h2></div>
                         <dl class="doc-definitions">
-                            <div><dt>Vitesse</dt><dd>Règle la lecture de la
-                                    chanson, de 50 % à 100 % (75 % par
-                                    défaut).</dd></div>
-                            <div><dt>Hyperspeed</dt><dd>Change la vitesse de
-                                    défilement des notes, de 0,8× à 2,5× (1,5×
-                                    par défaut), sans accélérer la
-                                    musique.</dd></div>
-                            <div><dt>Taille des notes</dt><dd>Ajuste leur taille
-                                    de 50 % à 150 %; cela ne change ni le timing
-                                    ni la ligne de frappe.</dd></div>
-                            <div><dt>Practice</dt><dd>Permet de choisir le début
-                                    et la fin parmi les sections de la chart,
-                                    puis de répéter ce passage. En Practice, le
-                                    Star Power est désactivé.</dd></div>
-                            <div><dt>No-Fail Mode</dt><dd>Empêche la partie de
-                                    s’arrêter à cause de la stage presence. Le
-                                    score de cette partie n’est pas
+                            <div><dt data-i18n="doc.speedTitle">Vitesse</dt><dd
+                                    data-i18n="doc.speedText">Ralentis la
+                                    musique pour t’entraîner.</dd></div>
+                            <div><dt>Hyperspeed</dt><dd
+                                    data-i18n="doc.hyperspeedText">Ajuste le
+                                    défilement des notes sans changer la vitesse
+                                    de la musique.</dd></div>
+                            <div><dt data-i18n="doc.noteSizeTitle">Taille des
+                                    notes</dt><dd
+                                    data-i18n="doc.noteSizeText">Ajuste leur
+                                    taille à l’écran.</dd></div>
+                            <div><dt>Practice</dt><dd
+                                    data-i18n="doc.practiceText">Répète un
+                                    passage choisi. Le Star Power est désactivé
+                                    dans ce mode.</dd></div>
+                            <div><dt>No-Fail Mode</dt><dd
+                                    data-i18n="doc.noFailText">Continue à jouer
+                                    après tes erreurs; le score n’est pas
                                     enregistré.</dd></div>
-                            <div><dt>Délai audio</dt><dd>Décale la musique de
-                                    −300 à +300 ms. Une valeur négative la fait
-                                    entendre plus tôt; utile si le son arrive en
-                                    retard.</dd></div>
-                            <div><dt>Délai vidéo</dt><dd>Décale l’affichage des
-                                    notes de −300 à +300 ms. Une valeur positive
-                                    les affiche plus tôt si l’écran paraît en
-                                    retard.</dd></div>
-                            <div><dt>Aperçu de la hitzone</dt><dd>Affiche la
-                                    zone de frappe calibrée pour aider à régler
-                                    les délais.</dd></div>
+                            <div><dt
+                                    data-i18n="doc.calibrationTitle">Calibration</dt><dd
+                                    data-i18n="doc.calibrationText">Ajuste le
+                                    timing si les notes et la musique semblent
+                                    décalées.</dd></div>
                         </dl>
-                        <h3>Star Power</h3>
-                        <p>Réussis toutes les notes d’une phrase étoilée pour
-                            ajouter 25 % à la jauge. À partir de 50 %, active le
-                            Star Power avec la touche ou le bouton associé: le
-                            multiplicateur de score est doublé pendant 8
-                            secondes. En Practice, les phrases étoilées et le
-                            Star Power ne sont pas actifs.</p>
-                        <h3>Personnalisation</h3>
-                        <p>Le panneau <em>Custom</em> permet de choisir la
-                            couleur principale et une image de fond du highway.
-                            L’image est stockée localement; utilise <em>Retirer
-                                l’image</em> pour revenir au fond par
-                            défaut.</p>
-                        <h3>Affichage et langue</h3>
-                        <p>Le bouton <em>Plein écran</em> se trouve en haut de
-                            la page de jeu. Le sélecteur FR/EN change la langue
-                            de l’interface et mémorise ton choix dans ce
-                            navigateur.</p>
+                        <h3 data-i18n="doc.customTitle">Personnalisation</h3>
+                        <p data-i18n="doc.customText">Choisis une couleur ou une
+                            image de fond dans le panneau Custom. Le plein écran
+                            et la langue se règlent en haut de la page de
+                            jeu.</p>
                     </section>
 
                     <section id="resultats" class="doc-section">
-                        <div class="doc-section-heading">
-                            <span class="doc-section-number">05</span>
-                            <h2>Pause et résultats</h2>
-                        </div>
-                        <p>La pause arrête la musique. Reprendre recale la
-                            lecture et la timeline avec un retour de trois
-                            secondes. En Practice, le menu de pause propose
-                            aussi de recommencer la section; cette action remet
-                            les statistiques du passage à zéro.</p>
-                        <p>À la fin, après un arrêt ou après un game over, le
-                            récapitulatif affiche le score, la précision, la
-                            durée, le nombre de notes, les hits et misses, le
-                            délai moyen et la meilleure série. Un délai négatif
-                            indique des frappes en avance; un délai positif, des
-                            frappes en retard. Tu peux rejouer ou revenir à
-                            l’écran de jeu.</p>
+                        <div class="doc-section-heading"><span
+                                class="doc-section-number">06</span><h2
+                                data-i18n="doc.resultsHeading">Pause et
+                                résultats</h2></div>
+                        <p data-i18n="doc.resultsText">Appuie sur Échap ou START
+                            pour mettre la partie en pause. À la fin, consulte
+                            ton score et ta précision, puis rejoue ou retourne
+                            au jeu.</p>
                     </section>
 
                     <section id="fonctionnement" class="doc-section">
-                        <div class="doc-section-heading">
-                            <span class="doc-section-number">06</span>
-                            <h2>Données et fonctionnement</h2>
-                        </div>
-                        <p>Le navigateur lit la chart, prépare la timeline des
-                            notes, décode les pistes audio et les synchronise
-                            pendant la partie. Le canvas dessine la piste, les
-                            notes et le HUD au fil de l’animation.</p>
-                        <p>Les fichiers importés restent sur ton appareil: les
-                            charts et les pistes audio ne sont pas envoyées au
-                            serveur. WebHero mémorise localement les réglages,
-                            la langue et la dernière chart; les fichiers audio
-                            associés sont conservés dans le cache du navigateur
-                            afin de pouvoir les restaurer au prochain
-                            chargement.</p>
-                        <p><em>Décharger la chart</em> retire la chart courante
-                            ainsi que sa sauvegarde locale et son cache audio.
-                            Effacer les données du site dans le navigateur
-                            supprime également les réglages et les fichiers
-                            mémorisés.</p>
+                        <div class="doc-section-heading"><span
+                                class="doc-section-number">07</span><h2
+                                data-i18n="doc.dataHeading">Données</h2></div>
+                        <p data-i18n="doc.dataText">Tes chansons et réglages
+                            restent dans ton navigateur, sans être envoyés au
+                            serveur. La dernière chanson importée est mémorisée
+                            sur cet appareil.</p>
                     </section>
 
                     <section id="depannage" class="doc-section">
-                        <div class="doc-section-heading">
-                            <span class="doc-section-number">07</span>
-                            <h2>Dépannage</h2>
-                        </div>
+                        <div class="doc-section-heading"><span
+                                class="doc-section-number">08</span><h2
+                                data-i18n="doc.troubleshootingHeading">Dépannage</h2></div>
                         <div class="doc-rule-list">
-                            <p><strong>Aucune difficulté
-                                    n’apparaît</strong><span>Vérifie que la
-                                    chart a bien été importée et contient une
-                                    difficulté avec une piste de guitare à cinq
-                                    lanes.</span></p>
-                            <p><strong>Le dossier est
-                                    refusé</strong><span>Importe un seul dossier
-                                    de chanson, pas le dossier parent de
-                                    plusieurs chansons; vérifie la présence d’un
-                                    fichier .chart, .mid ou .midi.</span></p>
-                            <p><strong>Je n’entends pas la
-                                    musique</strong><span>Vérifie que les
-                                    fichiers audio sont dans le même dossier que
-                                    la chart et que ton navigateur sait les
-                                    décoder. Ajuste ensuite le délai audio si le
-                                    son est décalé.</span></p>
-                            <p><strong>La manette ne s’affiche
-                                    pas</strong><span>Reconnecte-la, vérifie
-                                    qu’elle est reconnue par le navigateur, puis
-                                    appuie sur un bouton pour
-                                    l’activer.</span></p>
-                            <p><strong>Une guitare de jeu n’est pas
-                                    reconnue</strong><span>Selon le modèle, un
-                                    adaptateur USB ou un récepteur sans fil
-                                    compatible peut être nécessaire pour
-                                    connecter la guitare à l’ordinateur. Vérifie
-                                    que le système la reconnaît avant de lancer
-                                    WebHero.</span></p>
+                            <p><strong data-i18n="doc.noDifficultyTitle">Aucune
+                                    difficulté n’apparaît</strong><span
+                                    data-i18n="doc.noDifficultyText">Vérifie que
+                                    la chanson est importée et contient une
+                                    chart guitare.</span></p>
+                            <p><strong data-i18n="doc.folderRejectedTitle">Le
+                                    dossier est refusé</strong><span
+                                    data-i18n="doc.folderRejectedText">Choisis
+                                    le dossier d’une seule chanson, pas celui
+                                    d’un lot.</span></p>
+                            <p><strong data-i18n="doc.noMusicTitle">Pas de
+                                    musique</strong><span
+                                    data-i18n="doc.noMusicText">Place les
+                                    fichiers audio avec la chart et vérifie que
+                                    ton navigateur peut les lire.</span></p>
+                            <p><strong data-i18n="doc.controllerIssueTitle">La
+                                    manette ne répond pas</strong><span
+                                    data-i18n="doc.controllerIssueText">Reconnecte-la,
+                                    puis appuie sur un bouton avant de
+                                    jouer.</span></p>
                         </div>
-                        <p class="doc-endnote">Pour reprendre une partie,
-                            retourne au jeu avec le bouton en haut de cette
-                            page.</p>
+                        <p class="doc-endnote" data-i18n="doc.endnote">Utilise
+                            le bouton en haut de cette page pour retourner au
+                            jeu.</p>
                     </section>
                 </article>
             </main>
             <footer class="doc-footer"><span>WEBHERO</span><a
-                    href="./index.html" data-i18n-html="doc.return">Retour au
+                    href="./index.html" data-i18n="doc.return">Retour au
                     jeu</a></footer>
         </div>
         <script type="module">
             import { initI18n } from "./js/i18n.mjs";
             initI18n();
+
+            const progress = document.querySelector(".doc-scroll-progress");
+            const links = [...document.querySelectorAll(".doc-toc a[href^='#']")];
+            const linkBySection = new Map(links.map((link) => [link.hash.slice(1), link]));
+            const setActiveLink = (activeLink) => {
+                for (const link of links) link.removeAttribute("aria-current");
+                activeLink?.setAttribute("aria-current", "location");
+            };
+            const updateProgress = () => {
+                const range = document.documentElement.scrollHeight - window.innerHeight;
+                const value = range > 0 ? Math.min(1, window.scrollY / range) : 0;
+                progress.style.setProperty("--scroll-progress", value);
+                progress.setAttribute("aria-valuenow", String(Math.round(value * 100)));
+                if (value >= 0.999) setActiveLink(links.at(-1));
+            };
+            window.addEventListener("scroll", updateProgress, { passive: true });
+            window.addEventListener("resize", updateProgress);
+            document.addEventListener("webhero:languagechange", updateProgress);
+            updateProgress();
+            setActiveLink(links[0]);
+            const sectionObserver = new IntersectionObserver((entries) => {
+                if (window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 1) {
+                    setActiveLink(links.at(-1));
+                    return;
+                }
+                for (const { target, isIntersecting } of entries) {
+                    if (!isIntersecting) continue;
+                    setActiveLink(linkBySection.get(target.id));
+                }
+            }, { rootMargin: "-18% 0px -72% 0px" });
+            document.querySelectorAll(".doc-article .doc-section").forEach((section) => sectionObserver.observe(section));
         </script>
         <script async src="https://kit.fontawesome.com/9a6b0f1631.js"
             crossorigin="anonymous"></script>

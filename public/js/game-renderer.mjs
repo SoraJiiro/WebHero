@@ -162,8 +162,7 @@ export function createGameRenderer({ canvas, state, colors }) {
     const width = state.viewWidth;
     const height = state.viewHeight;
     ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = "#080808";
-    ctx.fillRect(0, 0, width, height);
+
     const { x: trackX, width: trackWidth, laneWidth } = getTrackBounds();
     const hitY = height - HIT_ZONE_OFFSET;
     const topY = Math.max(0, height * 0.05);

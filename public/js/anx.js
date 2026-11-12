@@ -1,6 +1,6 @@
 document.addEventListener("DOMContentLoaded", function () {
-  const docButton = document.querySelector("documentation-button") ?? null;
-  const gameButton = document.querySelector("game-button") ?? null;
+  const docButton = document.querySelector("#documentation-button") ?? null;
+  const gameButton = document.querySelector("#game-button") ?? null;
 
   let uid = JSON.parse(window.sessionStorage.getItem("wh-uid")) ?? null;
 

@@ -2,3 +2,4 @@ test/*
 specs/*
 specs/PROJECT.md
 GuitarControllerMap.yml
+test_chart/*
