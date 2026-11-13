@@ -311,7 +311,6 @@ export function createGameRenderer({ canvas, state, colors }) {
       ctx.lineTo(trackEdgeAt(x, height), height);
       ctx.stroke();
     }
-    // Bordures latérales seulement, pas de bord supérieur.
     ctx.strokeStyle = "rgba(210,220,235,.48)";
     ctx.lineWidth = 3;
     ctx.beginPath();

@@ -2239,10 +2239,7 @@ export function initWebHero(socket = null) {
   draw(0);
   setStatus("status.importPrompt");
   void restorePreviousChart();
-  if (canvas) canvas.focus();
-  /*alert(
-    "Sur PC, utilisez l'option de plein écran pour une meilleure expérience.",
-  );*/
+  canvas.focus();
 }
 
 initWebHero();
