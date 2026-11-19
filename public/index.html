@@ -21,7 +21,6 @@
     <link rel="icon" type="image/svg+xml" href="./assets/imgs/WH-LOGO.svg" />
     <title data-i18n="meta.title">WebHero — jeu de rythme gratuit</title>
     <link rel="stylesheet" href="./css/styles.css" />
-    <script src="./js/anx.js" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#game-area" data-i18n="nav.skip">Passer au
@@ -58,7 +57,8 @@
               <span>Informations</span></span>
             <button id="documentation-button" class="ghost-button" type="button"
               aria-label="Documentation"
-              title="Documentation"><i
+              title="Documentation"
+              onclick="window.open('./doc.html', '_blank')"><i
                 class="fa-regular fa-file-lines" aria-hidden="true"></i><span><a
                   href="./doc.html" class="doc-link"
                   target="_blank">Documentation</a></span></button>
@@ -158,8 +158,8 @@
             touches D, F, J, K et L lorsque les notes atteignent la ligne de
             frappe, ou utilisez les boutons tactiles. Appuyez sur Espace
             lorsque
-            la jauge Star Power atteint 50 % pour doubler le score pendant 8
-            s.</p>
+            la jauge Star Power atteint 50 % pour doubler le score pendant 6
+            à 20 s selon la durée de la chart.</p>
           <div id="web-hero-lyrics" class="lyrics" aria-live="polite"
             hidden></div>
           <section id="web-hero-pause" class="game-over" role="dialog"

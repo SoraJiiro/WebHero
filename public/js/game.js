@@ -195,6 +195,7 @@ export function initWebHero(socket = null) {
     starPowerCharge: 0,
     starPowerActivatedAt: 0,
     starPowerActiveUntil: 0,
+    starPowerDuration: 0,
     starPowerPhrases: [],
     maxCombo: 0,
     misses: 0,
@@ -1058,6 +1059,7 @@ export function initWebHero(socket = null) {
       state.chartSpeed,
     );
     state.chartDuration = schedule.duration;
+    state.starPowerDuration = schedule.starPowerDuration;
     state.starPowerPhrases = state.practiceRange
       ? []
       : schedule.starPowerPhrases;
@@ -1368,9 +1370,9 @@ export function initWebHero(socket = null) {
       logAction("starpower.rejected", { reason });
       return;
     }
-    state.starPowerCharge -= 50;
+    state.starPowerCharge = 0;
     state.starPowerActivatedAt = now;
-    state.starPowerActiveUntil = now + 8000;
+    state.starPowerActiveUntil = now + state.starPowerDuration;
     logAction("starpower.activated", { charge: state.starPowerCharge });
   }
 

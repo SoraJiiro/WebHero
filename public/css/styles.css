@@ -1715,22 +1715,23 @@ label i.fa-solid {
   display: inline-block;
   background-image: url("../assets/hud/notes.png");
   background-repeat: no-repeat;
-  background-size: 250px 250px;
+  background-size: 250px auto;
 }
 .doc-note-icon--normal {
   background-position: -100px 0;
 }
 .doc-note-icon--hopo {
-  background-position: -100px -41.6667px;
+  background-position: -100px -42.7912px;
 }
 .doc-note-icon--tap {
-  background-position: -100px -83.3333px;
+  height: 39px;
+  background-position: -100px -85.5824px;
 }
 .doc-note-icon--star-phrase {
   background-position: -100px -125px;
 }
 .doc-note-icon--star-active {
-  background-position: 0 -166.6667px;
+  background-position: 0 -296.5px;
 }
 .doc-rule-list span {
   font-size: 0.9rem;

@@ -427,6 +427,7 @@ export function parseWebHeroMidi(input) {
 }
 
 export function scheduleWebHeroTrack(track, startAt, travelTime, chartSpeed) {
+  const duration = track.duration / chartSpeed;
   const notes = track.notes.map((note) => ({
     lane: note.lane,
     type: note.type,
@@ -452,7 +453,8 @@ export function scheduleWebHeroTrack(track, startAt, travelTime, chartSpeed) {
   });
   return {
     startAt,
-    duration: track.duration / chartSpeed,
+    duration,
+    starPowerDuration: Math.min(20_000, Math.max(6_000, duration * 100)),
     notes,
     starPowerPhrases: [...phrases.values()],
   };

@@ -3,3 +3,5 @@ specs/*
 specs/PROJECT.md
 GuitarControllerMap.yml
 test_chart/*
+public/assets/hud/notes_backup.png
+public/assets/hud/notes_draft.png

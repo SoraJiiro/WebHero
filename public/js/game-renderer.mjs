@@ -2,17 +2,16 @@ import { getFullComboStatus } from "./utils.js";
 import { formatNumber, t } from "./i18n.mjs";
 
 export const HIT_ZONE_OFFSET = 90;
-export const HIT_ZONE_HEIGHT_RATIO = 0.18;
+export const HIT_ZONE_HEIGHT_RATIO = 0.22;
 export const TARGET_MAX_RADIUS = 30;
 export const NOTE_MAX_RADIUS = 26;
 
-// Feuille de sprites : colonnes vert/rouge/jaune/bleu/orange ; lignes 0 note, 1 lumineuse, 2 vitre.
+// Feuille de sprites : 5 colonnes, 8 lignes ; les deux dernières sont les effets Star Power.
 const SPRITE_COL = [0, 1, 2, 3, 4];
-const SPRITE_PITCH = { x: 100, y: 500 / 6 };
-const SPRITE_ART = { dx: 1, dy: 1, w: 98, h: 500 / 6 - 2 };
 const STAR_POWER_COL = { strum: 0, hopo: 1, tap: 2 };
 const STAR_POWER_ROW = 3;
-const STAR_POWER_ACTIVE_ROW = 5;
+const STAR_POWER_NORMAL_ACTIVE_ROW = 6;
+const STAR_POWER_ACTIVE_ROW = 7;
 
 const HITTER = {
   columnX: [30, 338.75, 628, 921.75, 1215],
@@ -45,6 +44,10 @@ export function createGameRenderer({ canvas, state, colors }) {
   const notesImg = loadImage("notes.png");
   const hitterImg = loadImage("hitter_sprite.png");
   const fireImg = loadImage("fire_sprite.png");
+  const spritePitch = () => ({
+    x: notesImg.naturalWidth / 5,
+    y: notesImg.naturalHeight / 8,
+  });
   let highwayImage = null;
   let highwayImageSource = "";
   const isReady = (img) => img?.complete && img.naturalWidth > 0;
@@ -85,13 +88,24 @@ export function createGameRenderer({ canvas, state, colors }) {
       height,
     );
   }
-  function drawSprite(lane, row, cx, cy, width, height) {
+  function drawAtlasSprite(
+    column,
+    row,
+    cx,
+    cy,
+    width,
+    height,
+    sourceYOffset = 0,
+  ) {
+    const pitch = spritePitch();
+    const insetX = pitch.x * 0.01;
+    const insetY = pitch.y * 0.01;
     ctx.drawImage(
       notesImg,
-      SPRITE_COL[lane] * SPRITE_PITCH.x + SPRITE_ART.dx,
-      row * SPRITE_PITCH.y + SPRITE_ART.dy,
-      SPRITE_ART.w,
-      SPRITE_ART.h,
+      column * pitch.x + insetX,
+      row * pitch.y + insetY + sourceYOffset,
+      pitch.x - insetX * 2,
+      pitch.y - insetY * 2,
       cx - width / 2,
       cy - height / 2,
       width,
@@ -99,22 +113,30 @@ export function createGameRenderer({ canvas, state, colors }) {
     );
     return height;
   }
-  function drawStarPowerSprite(type, cx, cy, width, height) {
-    ctx.drawImage(
-      notesImg,
-      (STAR_POWER_COL[type] ?? 0) * SPRITE_PITCH.x + SPRITE_ART.dx,
-      STAR_POWER_ACTIVE_ROW * SPRITE_PITCH.y + SPRITE_ART.dy,
-      SPRITE_ART.w,
-      SPRITE_ART.h,
-      cx - width / 2,
-      cy - height / 2,
+  function drawSprite(lane, row, cx, cy, width, height, sourceYOffset = 0) {
+    return drawAtlasSprite(
+      SPRITE_COL[lane],
+      row,
+      cx,
+      cy,
       width,
       height,
+      sourceYOffset,
     );
-    return height;
+  }
+  function drawStarPowerSprite(type, row, cx, cy, width, height) {
+    return drawAtlasSprite(
+      STAR_POWER_COL[type] ?? 0,
+      row,
+      cx,
+      cy,
+      width,
+      height,
+      row === STAR_POWER_NORMAL_ACTIVE_ROW ? -12 : 0,
+    );
   }
   let trackBounds = { center: 0, x: 0, width: 0, laneWidth: 0 };
-  const multiplierColors = ["#aeb8c7", "#48d8c5", "#ffd43b", "#f05aa6"];
+  const multiplierColors = ["#b16668", "#48d8c5", "#ffd43b", "#e85af0"];
 
   function resize() {
     const width = Math.max(1, canvas.parentElement.clientWidth);
@@ -483,7 +505,7 @@ export function createGameRenderer({ canvas, state, colors }) {
         const tailX = laneCenterAt(note.lane, tailY);
         const sustainHeadX = laneCenterAt(note.lane, sustainHeadY);
         ctx.globalAlpha = note.releasedAt ? 0.22 : 0.55;
-        ctx.fillStyle = colors[note.lane];
+        ctx.fillStyle = starPowerActive ? "#69e5ff" : colors[note.lane];
         ctx.beginPath();
         ctx.moveTo(tailX - tailHalfWidth, tailY);
         ctx.lineTo(tailX + tailHalfWidth, tailY);
@@ -500,19 +522,36 @@ export function createGameRenderer({ canvas, state, colors }) {
       if (notesReady) {
         const row = note.type === "tap" ? 2 : note.type === "hopo" ? 1 : 0;
         const noteWidth = spriteWidth * projection;
-        const noteHeight = (spriteWidth * SPRITE_ART.h) / SPRITE_ART.w;
+        const pitch = spritePitch();
+        const noteHeight = (spriteWidth * pitch.y) / pitch.x;
         const phrase = state.starPowerPhrases?.find(
           ({ id }) => id === note.starPowerPhrase,
         );
-        if (
-          state.practiceRange ||
-          note.starPowerPhrase === undefined ||
-          phrase?.failed
-        )
+        const isStarPowerNote =
+          note.starPowerPhrase !== undefined && !phrase?.failed;
+        if (starPowerActive)
+          drawStarPowerSprite(
+            note.type,
+            isStarPowerNote
+              ? STAR_POWER_ACTIVE_ROW
+              : STAR_POWER_NORMAL_ACTIVE_ROW,
+            x,
+            y,
+            noteWidth,
+            noteHeight,
+          );
+        else if (state.practiceRange || !isStarPowerNote)
           drawSprite(note.lane, row, x, y, noteWidth, noteHeight);
-        else if (!starPowerActive)
-          drawSprite(note.lane, STAR_POWER_ROW, x, y, noteWidth, noteHeight);
-        else drawStarPowerSprite(note.type, x, y, noteWidth, noteHeight);
+        else
+          drawSprite(
+            note.lane,
+            STAR_POWER_ROW + row,
+            x,
+            y,
+            noteWidth,
+            noteHeight,
+            -8,
+          );
         ctx.globalAlpha = 1;
         return;
       }

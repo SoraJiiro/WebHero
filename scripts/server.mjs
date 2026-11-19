@@ -18,17 +18,10 @@ const contentTypes = {
 
 export function createWebHeroServer() {
   return createServer(async (request, response) => {
-    const startedAt = performance.now();
-    const loggedPath = (request.url || "/").split("?")[0];
-    response.once("finish", () => {
-      console.info("[WebHero server]", {
-        method: request.method,
-        path: loggedPath,
-        status: response.statusCode,
-        durationMs: Math.round(performance.now() - startedAt),
-      });
-    });
-    const url = new URL(request.url, `http://${request.headers.host || "localhost"}`);
+    const url = new URL(
+      request.url,
+      `http://${request.headers.host || "localhost"}`,
+    );
     if (request.method !== "GET" && request.method !== "HEAD") {
       response.writeHead(405, { allow: "GET, HEAD" });
       response.end();
@@ -59,7 +52,8 @@ export function createWebHeroServer() {
       if (!fileStat.isFile()) throw new Error("Not a file");
       response.writeHead(200, {
         "content-length": fileStat.size,
-        "content-type": contentTypes[path.extname(filePath).toLowerCase()] ||
+        "content-type":
+          contentTypes[path.extname(filePath).toLowerCase()] ||
           "application/octet-stream",
         "x-content-type-options": "nosniff",
       });
@@ -78,9 +72,10 @@ export function createWebHeroServer() {
   });
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   const port = Number(process.env.PORT || 8000);
-  createWebHeroServer().listen(port, "0.0.0.0", () => {
-    console.log(`WebHero server listening on http://localhost:${port}`);
-  });
+  createWebHeroServer().listen(port, "0.0.0.0");
 }
