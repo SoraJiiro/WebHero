@@ -501,6 +501,35 @@
                   aria-label="Bouton Star Power de la manette"
                   title="Cliquer puis appuyer sur un bouton de la manette"
                   data-i18n-attrs="aria-label:controller.starPowerAria;title:controller.learnTitle"></button></label>
+              <label class="pause-map" title="Axe whammy"
+                data-i18n-attrs="title:controller.whammy"><i
+                  class="fa-solid fa-wave-square" aria-hidden="true"></i><button
+                  class="web-hero-axis" type="button"
+                  aria-label="Axe whammy de la manette"
+                  title="Cliquer puis bouger l'axe ; recliquer pour désactiver"
+                  data-i18n-attrs="aria-label:controller.whammyAria;title:controller.axisLearnTitle"></button></label>
+              <label class="pause-map" title="Axe tilt (Star Power)"
+                data-i18n-attrs="title:controller.tilt"><i
+                  class="fa-solid fa-rotate-right"
+                  aria-hidden="true"></i><button
+                  class="web-hero-axis" type="button"
+                  aria-label="Axe tilt de la manette"
+                  title="Cliquer puis bouger l'axe ; recliquer pour désactiver"
+                  data-i18n-attrs="aria-label:controller.tiltAria;title:controller.axisLearnTitle"></button></label>
+              <label class="pause-map" title="Zone morte du whammy (%)"
+                data-i18n-attrs="title:controller.deadzone"><i
+                  class="fa-solid fa-sliders" aria-hidden="true"></i><input
+                  id="web-hero-whammy-deadzone" class="web-hero-axis-range"
+                  type="range" min="0" max="50" step="1"
+                  aria-label="Zone morte du whammy"
+                  data-i18n-attrs="aria-label:controller.deadzone"></label>
+              <label class="pause-map" title="Seuil du tilt (%)"
+                data-i18n-attrs="title:controller.threshold"><i
+                  class="fa-solid fa-gauge-high" aria-hidden="true"></i><input
+                  id="web-hero-tilt-threshold" class="web-hero-axis-range"
+                  type="range" min="20" max="95" step="1"
+                  aria-label="Seuil du tilt"
+                  data-i18n-attrs="aria-label:controller.threshold"></label>
             </div>
           </section>
           <section class="settings-panel key-row" role="group"

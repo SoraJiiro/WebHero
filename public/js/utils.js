@@ -29,9 +29,15 @@ export function pickPad(pads) {
   return list.find((p) => p.mapping === "standard") ?? list[0];
 }
 
-export function getPressedPadButtons(pads) {
+export function getPressedPadButtons(pads, hasGuitarHat = false) {
   const down = new Set();
-  pickPad(pads)?.buttons.forEach((b, i) => b.pressed && down.add(i));
+  const pad = pickPad(pads);
+  pad?.buttons.forEach((b, i) => b.pressed && down.add(i));
+  if (hasGuitarHat) {
+    const hat = pad?.axes[9];
+    if (Math.abs(hat + 1) < 0.05) down.add(12);
+    if (Math.abs(hat - 1 / 7) < 0.05) down.add(13);
+  }
   return down;
 }
 
@@ -49,6 +55,13 @@ export function getActivePadLanes(padButtons, down) {
   );
 }
 
+// Niveau 0..1 d'un axe par rapport à son repos, dans le sens appris (dir = ±1).
+export function getAxisLevel(value, rest, dir) {
+  const span = dir > 0 ? 1 - rest : rest + 1;
+  if (span < 0.1) return 0;
+  return Math.min(1, Math.max(0, ((value - rest) * dir) / span));
+}
+
 export function diffPadLanes(padButtons, down, heldLanes) {
   const active = new Set(getActivePadLanes(padButtons, down));
   const press = [...active].filter((lane) => !heldLanes.has(lane));
@@ -62,7 +75,7 @@ export function getFullComboStatus(state) {
   return state.hits === state.totalNotes ? "complete" : "possible";
 }
 
-export const GUITAR_WINDOW = 150;
+export const GUITAR_WINDOW = 200;
 
 export function findGuitarGroup(notes, now, window = GUITAR_WINDOW) {
   const open = notes.filter(

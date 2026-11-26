@@ -51,6 +51,20 @@ export function cleanLyric(text) {
     .trim();
 }
 
+// Marqueurs solo/soloend (ou note MIDI 103) → intervalles [start, end] en ticks.
+function pairSolos(events) {
+  const ranges = [];
+  let start = null;
+  for (const { tick, end } of events.sort((a, b) => a.tick - b.tick)) {
+    if (!end) start = tick;
+    else if (start !== null) {
+      ranges.push({ start, end: tick });
+      start = null;
+    }
+  }
+  return ranges;
+}
+
 export function parseWebHeroChart(text) {
   if (typeof text !== "string") throw new Error("Fichier .chart invalide.");
 
@@ -96,9 +110,20 @@ export function parseWebHeroChart(text) {
   };
 
   const tracks = {};
+  const soloEvents = (text) =>
+    [
+      ...text.matchAll(
+        /^\s*(\d+)\s*=\s*E\s+"?\[?\s*(solo|soloend)\s*\]?"?\s*$/gim,
+      ),
+    ].map(([, tick, name]) => ({
+      tick: Number(tick),
+      end: name.toLowerCase() === "soloend",
+    }));
+  const globalSolos = soloEvents(sections.get("events") || "");
   for (const [name, body] of sections) {
     const match = name.match(/^(easy|medium|hard|expert)(single)?$/);
     if (!match) continue;
+    const soloRanges = pairSolos([...globalSolos, ...soloEvents(body)]);
     const difficulty = match[1];
     const raw = [...body.matchAll(/^\s*(\d+)\s*=\s*N\s+([0-7])\s+(\d+)/gm)].map(
       ([, tick, lane, length]) => ({
@@ -130,6 +155,10 @@ export function parseWebHeroChart(text) {
       if (note.lane === 7) note.lane = 0;
       note.toggle = toggles.has(note.tick);
       note.tap = taps.has(note.tick);
+      const soloIndex = soloRanges.findIndex(
+        ({ start, end }) => note.tick >= start && note.tick <= end,
+      );
+      if (soloIndex >= 0) note.solo = soloIndex;
       const phraseIndex = starPowerPhrases.findIndex(
         (phrase) => note.tick >= phrase.start && note.tick < phrase.end,
       );
@@ -142,6 +171,10 @@ export function parseWebHeroChart(text) {
     tracks[difficulty] = {
       name: match[2] ? `${match[1]}Single` : match[1],
       notes,
+      solos: soloRanges.map(({ start, end }) => ({
+        start: timeAtTick(start),
+        end: timeAtTick(end),
+      })),
       duration: Math.max(...notes.map((note) => note.time + note.sustain)),
     };
   }
@@ -213,6 +246,7 @@ export function parseWebHeroMidi(input) {
   const tempos = [];
   const lyrics = [];
   const sections = [];
+  const soloEvents = [];
   const tracks = [];
   let offset = 8 + headerLength;
   let maxTick = 0;
@@ -267,6 +301,23 @@ export function parseWebHeroMidi(input) {
         } else if (type === 0x06) {
           const name = readMetaText(length).trim();
           if (name) sections.push({ tick, name, order: eventOrder++ });
+        } else if (type === 0x01) {
+          // Texte RB/CH : [section Nom], [prc_nom], [solo], [soloend]
+          const text = readMetaText(length)
+            .trim()
+            .replace(/^\[|\]$/g, "")
+            .trim();
+          const section = text.match(/^(?:section|prc)[\s_]+(.+)$/i)?.[1];
+          if (section) {
+            const name = section.replace(/_/g, " ").trim();
+            sections.push({
+              tick,
+              name: name[0].toUpperCase() + name.slice(1),
+              order: eventOrder++,
+            });
+          } else if (/^solo(end)?$/i.test(text)) {
+            soloEvents.push({ tick, end: text.length > 4 });
+          }
         }
         offset += length;
         continue;
@@ -374,6 +425,12 @@ export function parseWebHeroMidi(input) {
         end: note.end,
         endTime: timeAtTick(note.end),
       }));
+    const markerSolos = instrument.notes
+      .filter((note) => note.pitch === 103)
+      .map(({ start, end }) => ({ start, end }));
+    const soloRanges = markerSolos.length
+      ? markerSolos
+      : pairSolos(soloEvents.slice());
     for (const note of instrument.notes) {
       const lane = note.pitch - base;
       if (lane < 0 || lane > 4) continue;
@@ -396,6 +453,10 @@ export function parseWebHeroMidi(input) {
       const phraseIndex = starPowerPhrases.findIndex(
         (phrase) => note.start >= phrase.start && note.start < phrase.end,
       );
+      const soloIndex = soloRanges.findIndex(
+        ({ start, end }) => note.start >= start && note.start < end,
+      );
+      if (soloIndex >= 0) chartNotes.at(-1).solo = soloIndex;
       if (phraseIndex >= 0) {
         chartNotes.at(-1).starPowerPhrase = phraseIndex;
         chartNotes.at(-1).starPowerPhraseEnd =
@@ -408,6 +469,10 @@ export function parseWebHeroMidi(input) {
       playableTracks[difficulty] = {
         name: difficulty,
         notes: chartNotes,
+        solos: soloRanges.map(({ start, end }) => ({
+          start: timeAtTick(start),
+          end: timeAtTick(end),
+        })),
         duration: timeAtTick(maxTick),
       };
     }
@@ -434,6 +499,7 @@ export function scheduleWebHeroTrack(track, startAt, travelTime, chartSpeed) {
     spawnAt: startAt + (note.time / chartSpeed) * 1000 - travelTime,
     travelTime,
     sustain: note.sustain / chartSpeed,
+    solo: note.solo,
     starPowerPhrase: note.starPowerPhrase,
     starPowerPhraseEndAt:
       note.starPowerPhraseEnd === undefined
@@ -456,6 +522,14 @@ export function scheduleWebHeroTrack(track, startAt, travelTime, chartSpeed) {
     duration,
     starPowerDuration: Math.min(20_000, Math.max(6_000, duration * 100)),
     notes,
+    solos: (track.solos || [])
+      .map(({ start, end }, id) => ({
+        id,
+        startAt: startAt + (start / chartSpeed) * 1000,
+        endAt: startAt + (end / chartSpeed) * 1000,
+        noteCount: notes.filter((note) => note.solo === id).length,
+      }))
+      .filter(({ noteCount }) => noteCount > 0),
     starPowerPhrases: [...phrases.values()],
   };
 }

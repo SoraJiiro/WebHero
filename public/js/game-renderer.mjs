@@ -2,9 +2,9 @@ import { getFullComboStatus } from "./utils.js";
 import { formatNumber, t } from "./i18n.mjs";
 
 export const HIT_ZONE_OFFSET = 90;
-export const HIT_ZONE_HEIGHT_RATIO = 0.22;
-export const TARGET_MAX_RADIUS = 30;
-export const NOTE_MAX_RADIUS = 26;
+export const HIT_ZONE_HEIGHT_RATIO = 0.35;
+export const TARGET_MAX_RADIUS = 38;
+export const NOTE_MAX_RADIUS = 32;
 
 // Feuille de sprites : 5 colonnes, 8 lignes ; les deux dernières sont les effets Star Power.
 const SPRITE_COL = [0, 1, 2, 3, 4];
@@ -187,8 +187,8 @@ export function createGameRenderer({ canvas, state, colors }) {
 
     const { x: trackX, width: trackWidth, laneWidth } = getTrackBounds();
     const hitY = height - HIT_ZONE_OFFSET;
-    const topY = Math.max(0, height * 0.05);
-    const topScale = 0.82;
+    const topY = Math.max(0, height * 0.1);
+    const topScale = 0.88;
     const perspectiveAt = (y) =>
       Math.max(0.01, topScale + (1 - topScale) * (y / Math.max(1, hitY)));
     const laneCenterAt = (lane, y) =>
@@ -477,6 +477,10 @@ export function createGameRenderer({ canvas, state, colors }) {
       ctx.restore();
     }
 
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, topY, width, height - topY);
+    ctx.clip();
     state.notes.forEach((note) => {
       const progress = Math.max(0, (now - note.spawnAt) / note.travelTime);
       const y = note.hitRegistered ? hitY : progress * hitY;
@@ -504,13 +508,29 @@ export function createGameRenderer({ canvas, state, colors }) {
         const noteHalfWidth = Math.max(2, tailBaseWidth * headProjection);
         const tailX = laneCenterAt(note.lane, tailY);
         const sustainHeadX = laneCenterAt(note.lane, sustainHeadY);
-        ctx.globalAlpha = note.releasedAt ? 0.22 : 0.55;
+        const wave = note.holding ? state.whammy || 0 : 0;
+        ctx.globalAlpha = note.releasedAt ? 0.22 : wave ? 0.8 : 0.55;
         ctx.fillStyle = starPowerActive ? "#69e5ff" : colors[note.lane];
         ctx.beginPath();
-        ctx.moveTo(tailX - tailHalfWidth, tailY);
-        ctx.lineTo(tailX + tailHalfWidth, tailY);
-        ctx.lineTo(sustainHeadX + noteHalfWidth, sustainHeadY);
-        ctx.lineTo(sustainHeadX - noteHalfWidth, sustainHeadY);
+        // Whammy : le sustain tenu ondule ; sans whammy, un seul segment droit.
+        const steps = wave ? 24 : 1;
+        const edge = (i) => {
+          const k = i / steps;
+          const y = tailY + (sustainHeadY - tailY) * k;
+          const half = tailHalfWidth + (noteHalfWidth - tailHalfWidth) * k;
+          const dx =
+            Math.sin(y * 0.12 + now * 0.04) * wave * noteHalfWidth * 1.2;
+          return { y, half, x: tailX + (sustainHeadX - tailX) * k + dx };
+        };
+        for (let i = 0; i <= steps; i++) {
+          const { x, y, half } = edge(i);
+          if (i === 0) ctx.moveTo(x - half, y);
+          else ctx.lineTo(x - half, y);
+        }
+        for (let i = steps; i >= 0; i--) {
+          const { x, y, half } = edge(i);
+          ctx.lineTo(x + half, y);
+        }
         ctx.closePath();
         ctx.fill();
         ctx.globalAlpha = 1;
@@ -578,6 +598,7 @@ export function createGameRenderer({ canvas, state, colors }) {
       ctx.restore();
       ctx.globalAlpha = 1;
     });
+    ctx.restore();
     if (isReady(fireImg)) {
       const fireWidth = Math.min(laneWidth * 0.75, 88);
       for (let lane = 0; lane < 5; lane++) {
@@ -702,13 +723,24 @@ export function createGameRenderer({ canvas, state, colors }) {
         ctx.textAlign = "left";
         ctx.fillStyle = "rgba(255,255,255,.82)";
         ctx.font = `700 ${Math.max(10, Math.min(15, width * 0.016))}px sans-serif`;
+        const statsFontSize = Math.max(10, Math.min(15, width * 0.016));
+        const statsY = compactLayout
+          ? Math.max(height * 0.17, scoreY + scoreFontSize / 2 + 10)
+          : height * 0.24;
         ctx.fillText(
           `${accuracy}%  ${state.hits} ${t("game.hits")}  ${state.misses} ${t("game.miss")}`,
           hudX,
-          compactLayout
-            ? Math.max(height * 0.17, scoreY + scoreFontSize / 2 + 10)
-            : height * 0.24,
+          statsY,
         );
+        if (state.practiceBest) {
+          const { accuracy: bestAccuracy, hits, misses } = state.practiceBest;
+          ctx.fillStyle = "#ffd400";
+          ctx.fillText(
+            `${t("game.best")} ${bestAccuracy}%  ${hits} ${t("game.hits")}  ${misses} ${t("game.miss")}`,
+            hudX,
+            statsY + statsFontSize * 1.4,
+          );
+        }
         practiceStatsLabel = t("game.accuracy", {
           accuracy,
           hits: state.hits,
@@ -784,6 +816,35 @@ export function createGameRenderer({ canvas, state, colors }) {
       ctx.textAlign = "center";
       ctx.font = `bold ${Math.max(10, orbRadius * 1.05)}px sans-serif`;
       ctx.fillText(`x${shownMultiplier}`, orbX, orbY);
+      if (state.soloBox) {
+        const box = state.soloBox;
+        const boxHeight = Math.max(64, height * 0.11);
+        const boxY = height * 0.3;
+        const centerX = hudX + hudWidth / 2;
+        ctx.fillStyle = "rgba(12,8,20,.8)";
+        ctx.fillRect(hudX, boxY, hudWidth, boxHeight);
+        ctx.strokeStyle = state.primaryColor;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(hudX, boxY, hudWidth, boxHeight);
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "rgba(255,255,255,.7)";
+        ctx.font = "800 11px sans-serif";
+        ctx.fillText(t("solo.label"), centerX, boxY + 12, hudWidth - 12);
+        ctx.fillStyle = box.phase === "bonus" ? "#ffd400" : "#fff";
+        const mainSize = Math.min(30, boxHeight * 0.4);
+        ctx.font = `800 ${mainSize}px sans-serif`;
+        ctx.fillText(
+          box.phase === "live"
+            ? `${box.pct}%`
+            : box.phase === "comment"
+              ? t(box.textKey)
+              : `+${formatNumber(box.bonus)}`,
+          centerX,
+          boxY + boxHeight * 0.62,
+          hudWidth - 12,
+        );
+      }
       const canvasLabel = t("game.canvasLabel", {
         score: formatNumber(state.score),
         practiceStatsLabel: practiceStatsLabel ? ` ${practiceStatsLabel}` : "",

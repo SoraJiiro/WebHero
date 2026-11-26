@@ -38,6 +38,7 @@ import {
   fretsMatch,
   getFullComboStatus,
   getHoldTapLanes,
+  getAxisLevel,
   getPressedPadButtons,
   pickPad,
   GUITAR_WINDOW,
@@ -59,6 +60,13 @@ const HIGHWAY_BACKGROUND_KEY = "web-hero-highway-background";
 const REWIND_MS = 3000;
 const END_SILENCE_MS = 2200;
 const END_FADE_MS = 900;
+const PRACTICE_DELAY_MS = 1200;
+const SOLO_COMMENT_MS = 1800;
+const PRACTICE_BEST_KEY = "web-hero-practice-best";
+const SOLO_BONUS_MS = 3000;
+const WHAMMY_RATE = 0.5; // part du débit de score du sustain, ajoutée à plein whammy
+const WHAMMY_SP_PER_SECOND = 12; // charge Star Power/s à plein whammy sur une phrase SP
+const WHAMMY_DISTORTION = 0.35; // part max du signal distordu mélangé au son
 const COLORS = ["#63e6be", "#ff4f64", "#ffe14a", "#74a7ff", "#ffb347"];
 const DIFFICULTIES = {
   easy: { label: "Facile", travelTime: 3200 },
@@ -183,6 +191,7 @@ export function initWebHero(socket = null) {
     fadeAlpha: 0,
     pausedAt: 0,
     noFail: false,
+    whammy: 0,
     chartSpeed: 1,
     noteSize: 1,
     audioDelay: 0,
@@ -197,6 +206,9 @@ export function initWebHero(socket = null) {
     starPowerActiveUntil: 0,
     starPowerDuration: 0,
     starPowerPhrases: [],
+    solos: [],
+    soloBox: null,
+    practiceBest: null,
     maxCombo: 0,
     misses: 0,
     hits: 0,
@@ -248,7 +260,10 @@ export function initWebHero(socket = null) {
   });
   let savedSettings = {};
   let audioContext = null;
+  let whammyShaper = null;
+  let whammyWet = null;
   let audioBuffers = [];
+  let audioNames = [];
   let audioSources = [];
   let savedChartRecord = null;
   let lastChartId = null;
@@ -317,6 +332,12 @@ export function initWebHero(socket = null) {
   state.hitZonePreview = hitZonePreviewInput.checked;
 
   function saveSettings() {
+    if (state.chart)
+      savedSettings.practiceSections = {
+        chart: state.chartTitle,
+        start: practiceStartSectionSelect.value,
+        end: practiceEndSectionSelect.value,
+      };
     try {
       localStorage.setItem(
         SETTINGS_KEY,
@@ -332,6 +353,13 @@ export function initWebHero(socket = null) {
           practiceMode: practiceInput.checked,
           hitZonePreview: hitZonePreviewInput.checked,
           primaryColor: state.primaryColor,
+          practiceSections: state.chart
+            ? {
+                chart: state.chartTitle,
+                start: practiceStartSectionSelect.value,
+                end: practiceEndSectionSelect.value,
+              }
+            : savedSettings.practiceSections,
         }),
       );
     } catch (error) {
@@ -607,11 +635,12 @@ export function initWebHero(socket = null) {
     }
     const travelTime = state.travelTime;
     const hitY = state.viewHeight - HIT_ZONE_OFFSET;
-    const topY = Math.max(0, state.viewHeight * 0.05);
+    const topY = Math.max(0, state.viewHeight * 0.22);
     const hitZoneHalfHeight =
       ((state.viewHeight - topY) * HIT_ZONE_HEIGHT_RATIO) / 2;
     const timePastHitZone =
       travelTime * (hitZoneHalfHeight / Math.max(1, hitY));
+    state.hitZoneMs = timePastHitZone;
     while (
       state.pendingNotes.length > 0 &&
       state.pendingNotes[0].spawnAt <= now
@@ -628,6 +657,7 @@ export function initWebHero(socket = null) {
         travelTime: pendingNote.travelTime,
         starPowerPhrase: pendingNote.starPowerPhrase,
         starPowerPhraseEndAt: pendingNote.starPowerPhraseEndAt,
+        solo: pendingNote.solo,
         hitAt,
         hitUntil,
         missAt: Math.max(hitUntil + 50, hitAt + GUITAR_WINDOW + 50),
@@ -660,6 +690,10 @@ export function initWebHero(socket = null) {
         }
       }
       if (note.holding) {
+        if (now - (note.sparkAt ?? 0) > 110) {
+          note.sparkAt = now;
+          spawnSparks(note.lane, 2);
+        }
         creditSustain(note, now);
         if (now >= note.sustainEndAt) endSustain(note, note.sustainEndAt);
       }
@@ -690,10 +724,16 @@ export function initWebHero(socket = null) {
         state.notes.splice(index, 1);
     }
     settleStarPowerPhrases(now);
+    updateSolos(now);
     if (
       state.pendingNotes.length === 0 &&
       state.notes.length === 0 &&
-      now >= state.startedAt + state.chartDuration * 1000 + timePastHitZone
+      !state.soloBox &&
+      now >=
+        state.startedAt +
+          state.chartDuration * 1000 +
+          timePastHitZone +
+          (state.practiceRange ? PRACTICE_DELAY_MS : 0)
     ) {
       if (state.practiceRange) {
         repeatPractice(now);
@@ -724,6 +764,8 @@ export function initWebHero(socket = null) {
   }
 
   function markNoteMissed(note) {
+    const solo = state.solos.find((item) => item.id === note.solo);
+    if (solo) solo.missed = (solo.missed || 0) + 1;
     note.missed = true;
     const phrase = state.starPowerPhrases.find(
       (item) => item.id === note.starPowerPhrase,
@@ -780,11 +822,48 @@ export function initWebHero(socket = null) {
     audioSources = [];
   }
 
+  const practiceBestKey = () =>
+    `${state.chartTitle}|${state.difficulty}|${state.practiceRange.start}|${state.practiceRange.end}`;
+  const loadPracticeBests = () => {
+    try {
+      return JSON.parse(localStorage.getItem(PRACTICE_BEST_KEY)) || {};
+    } catch {
+      return {};
+    }
+  };
+
+  // Seules les passes complètes comptent, sinon un début parfait écraserait le best.
+  function recordPracticeRun() {
+    if (!state.practiceRange) return;
+    const played = state.hits + state.misses;
+    if (!played || played < state.totalNotes) return;
+    const run = {
+      accuracy: Math.round((state.hits / played) * 100),
+      hits: state.hits,
+      misses: state.misses,
+    };
+    const best = state.practiceBest;
+    if (
+      best &&
+      (run.accuracy < best.accuracy ||
+        (run.accuracy === best.accuracy && run.hits <= best.hits))
+    )
+      return;
+    state.practiceBest = run;
+    try {
+      localStorage.setItem(
+        PRACTICE_BEST_KEY,
+        JSON.stringify({ ...loadPracticeBests(), [practiceBestKey()]: run }),
+      );
+    } catch {}
+  }
+
   function finish(
     messageKey = "status.finished",
     { completed = false, stopped = false } = {},
   ) {
     if (!state.running) return;
+    recordPracticeRun();
     const endedAt =
       state.endingAt || (state.paused ? state.pausedAt : performance.now());
     state.paused = false;
@@ -885,6 +964,10 @@ export function initWebHero(socket = null) {
       shift(n, "spawnAt", "starPowerPhraseEndAt"),
     );
     state.starPowerPhrases.forEach((phrase) => shift(phrase, "endAt"));
+    state.solos.forEach((solo) => {
+      shift(solo, "startAt", "endAt");
+      if (solo.result) shift(solo.result, "at");
+    });
     state.lyrics.forEach((l) => shift(l, "at"));
     state.lyricPhrases.forEach((p) =>
       p.syllables.forEach((s) => shift(s, "at")),
@@ -998,6 +1081,10 @@ export function initWebHero(socket = null) {
                 : Math.min(note.starPowerPhraseEnd, segmentEnd) - segmentStart,
           })),
         duration: segmentEnd - segmentStart,
+        solos: (track.solos || []).map(({ start, end }) => ({
+          start: start - segmentStart,
+          end: end - segmentStart,
+        })),
       },
     };
   }
@@ -1063,11 +1150,14 @@ export function initWebHero(socket = null) {
     state.starPowerPhrases = state.practiceRange
       ? []
       : schedule.starPowerPhrases;
+    state.solos = schedule.solos;
+    state.soloBox = null;
     state.startedAt = schedule.startAt;
     return schedule;
   }
 
   function repeatPractice(now) {
+    recordPracticeRun();
     stopSong();
     state.score = 0;
     state.combo = 0;
@@ -1089,13 +1179,12 @@ export function initWebHero(socket = null) {
     state.particles = [];
     const schedule = scheduleTimeline(
       state.practiceTrack,
-      now + state.travelTime,
+      now + state.travelTime + PRACTICE_DELAY_MS,
     );
     if (audioBuffers.length) {
       playAudio(
         state.chartSpeed,
-        audioContext.currentTime +
-          Math.max(0, state.travelTime + state.audioDelay) / 1000,
+        audioTimeFor(schedule.startAt + state.audioDelay),
         state.practiceRange.start,
         state.practiceRange.end - state.practiceRange.start,
       );
@@ -1190,9 +1279,10 @@ export function initWebHero(socket = null) {
         if (
           restored?.record.id === savedChartRecord.id &&
           restored.audioRestored
-        )
+        ) {
           audioBuffers = restored.audioBuffers;
-        else storageWarning = "status.audioUnavailable";
+          audioNames = restored.record.audioFiles.map(({ name }) => name);
+        } else storageWarning = "status.audioUnavailable";
       } catch {
         storageWarning = "status.audioUnavailable";
       }
@@ -1206,7 +1296,8 @@ export function initWebHero(socket = null) {
     const chartSpeed = Number(chartSpeedInput.value);
     const hyperspeed = Number(hyperspeedInput.value);
     const travelTime = DIFFICULTIES[state.difficulty].travelTime / hyperspeed;
-    const startAt = performance.now() + travelTime;
+    const startLead = practiceInput.checked ? PRACTICE_DELAY_MS : 0;
+    const startAt = performance.now() + travelTime + startLead;
     const audioDelay = Number(audioDelayInput.value);
     state.travelTime = travelTime;
     state.chartSpeed = chartSpeed;
@@ -1216,6 +1307,9 @@ export function initWebHero(socket = null) {
       ? getPracticeSegment(chartTrack)
       : null;
     state.practiceTrack = state.practiceRange?.track || chartTrack;
+    state.practiceBest = state.practiceRange
+      ? (loadPracticeBests()[practiceBestKey()] ?? null)
+      : null;
     if (touchStarPowerButton) {
       const actionKey = state.practiceRange
         ? "pause.restartSection"
@@ -1227,9 +1321,6 @@ export function initWebHero(socket = null) {
       icon?.classList.toggle("fa-star", !state.practiceRange);
       icon?.classList.toggle("fa-rotate-left", !!state.practiceRange);
     }
-    const audioStartAt = audioBuffers.length
-      ? audioContext.currentTime + Math.max(0, travelTime + audioDelay) / 1000
-      : null;
     const schedule = scheduleTimeline(state.practiceTrack, startAt);
     state.running = true;
     logAction("game.start", {
@@ -1283,7 +1374,7 @@ export function initWebHero(socket = null) {
     if (audioBuffers.length) {
       playAudio(
         chartSpeed,
-        audioStartAt,
+        audioTimeFor(startAt + audioDelay),
         state.practiceRange?.start || 0,
         state.practiceRange
           ? state.practiceRange.end - state.practiceRange.start
@@ -1292,9 +1383,25 @@ export function initWebHero(socket = null) {
     }
   }
 
+  // Instant performance.now() → temps AudioContext, échantillonné au moment de l'appel.
+  const audioTimeFor = (perfMs) =>
+    audioContext.currentTime + (perfMs - performance.now()) / 1000;
+
   // offset en secondes de buffer ; startAt en temps AudioContext.
   function playAudio(chartSpeed, startAt, offset, duration) {
-    for (const buffer of audioBuffers) {
+    // Départ déjà passé : on avance dans le buffer au lieu de décaler la musique.
+    const late = audioContext.currentTime - startAt;
+    if (late > 0) {
+      startAt += late;
+      offset += late * chartSpeed;
+      if (duration !== undefined)
+        duration = Math.max(0, duration - late * chartSpeed);
+    }
+    // Avec des stems séparés, seule la guitare est distordue ; sinon tout le mix.
+    const isGuitar = (index) => /^guitar/i.test(audioNames[index] || "");
+    const guitarStem =
+      audioBuffers.length > 1 && audioNames.some((_, i) => isGuitar(i));
+    for (const [index, buffer] of audioBuffers.entries()) {
       const source = audioContext.createBufferSource();
       const gain = audioContext.createGain();
       source.buffer = buffer;
@@ -1302,6 +1409,17 @@ export function initWebHero(socket = null) {
       gain.gain.value = 1 / audioBuffers.length;
       source.connect(gain);
       gain.connect(audioContext.destination);
+      if (!whammyShaper) {
+        whammyShaper = audioContext.createWaveShaper();
+        whammyShaper.curve = Float32Array.from({ length: 256 }, (_, i) =>
+          Math.tanh(((i / 255) * 2 - 1) * 6),
+        );
+        whammyWet = audioContext.createGain();
+        whammyWet.gain.value = 0;
+        whammyShaper.connect(whammyWet);
+        whammyWet.connect(audioContext.destination);
+      }
+      if (!guitarStem || isGuitar(index)) gain.connect(whammyShaper);
       source.onended = () => {
         source.disconnect();
         audioSources = audioSources.filter((active) => active !== source);
@@ -1312,7 +1430,30 @@ export function initWebHero(socket = null) {
     }
   }
 
+  function spawnSparks(lane, count) {
+    const x = getLaneBounds(lane).center;
+    const y = state.viewHeight - HIT_ZONE_OFFSET;
+    const createdAt = performance.now();
+    for (let i = 0; i < count; i++) {
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.2;
+      const speed = 25 + Math.random() * 35;
+      state.particles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        size: 2 + Math.random() * 2,
+        color: COLORS[lane],
+        createdAt,
+        duration: 260 + Math.random() * 180,
+      });
+    }
+    if (state.particles.length > 150)
+      state.particles.splice(0, state.particles.length - 150);
+  }
+
   function registerHit(hitNote, lane, now) {
+    spawnSparks(lane, 7);
     state.fireAt[lane] = now;
     state.hits += 1;
     state.hitDelayTotal += now - hitNote.hitAt;
@@ -1320,23 +1461,71 @@ export function initWebHero(socket = null) {
     state.maxCombo = Math.max(state.maxCombo, state.combo);
     state.multiplier = getWebHeroMultiplier(state.combo);
     state.stagePresence = adjustWebHeroStagePresence(state.stagePresence, true);
-    state.score += Math.round(
+    const points = Math.round(
       100 * state.multiplier * state.scoreMultiplier * getStarPowerFactor(now),
     );
+    state.score += points;
+    const solo = state.solos.find((item) => item.id === hitNote.solo);
+    if (solo) {
+      solo.hits = (solo.hits || 0) + 1;
+      solo.score = (solo.score || 0) + points;
+    }
     const phrase = state.starPowerPhrases.find(
       (item) => item.id === hitNote.starPowerPhrase,
     );
     if (phrase) phrase.hits = (phrase.hits || 0) + 1;
+    const delayMs = Math.round(now - hitNote.hitAt);
     logAction("game.hit", {
       lane,
       type: hitNote.type,
-      delayMs: Math.round(now - hitNote.hitAt),
+      delayMs,
       combo: state.combo,
     });
   }
 
   function getStarPowerFactor(now) {
     return !state.practiceRange && state.starPowerActiveUntil > now ? 2 : 1;
+  }
+
+  function updateSolos(now) {
+    state.soloBox = null;
+    for (const solo of state.solos) {
+      if (now < solo.startAt) continue;
+      const hits = solo.hits || 0;
+      if (now < solo.endAt + 300) {
+        state.soloBox = {
+          phase: "live",
+          pct: Math.floor((hits / solo.noteCount) * 100),
+        };
+        continue;
+      }
+      if (!solo.result) {
+        const pct = (hits / solo.noteCount) * 100;
+        const key =
+          pct >= 100
+            ? "perfect"
+            : solo.noteCount - hits === 1
+              ? "choke"
+              : pct < 60
+                ? "messy"
+                : pct < 85
+                  ? "good"
+                  : pct < 95
+                    ? "great"
+                    : "amazing";
+        const bonus =
+          pct < 60 && key !== "choke" ? 0 : Math.round((solo.score || 0) * 3);
+        state.score += bonus;
+        solo.result = { key, bonus, pct: Math.floor(pct), at: now };
+        logAction("solo.completed", { key, pct: solo.result.pct, bonus });
+      }
+      const { key, bonus, pct, at } = solo.result;
+      const age = now - at;
+      if (age < SOLO_COMMENT_MS)
+        state.soloBox = { phase: "comment", pct, textKey: `solo.${key}` };
+      else if (age < SOLO_COMMENT_MS + SOLO_BONUS_MS)
+        state.soloBox = { phase: "bonus", pct, bonus };
+    }
   }
 
   function settleStarPowerPhrases(now) {
@@ -1402,6 +1591,36 @@ export function initWebHero(socket = null) {
       scoreSustain(poweredSeconds) - scoreSustain(scoredPoweredSeconds);
     note.sustainScoredSeconds = heldSeconds;
     note.sustainPoweredSeconds = poweredSeconds;
+    // Whammy : bonus proportionnel au niveau de l'axe, au prorata du temps tenu.
+    const whammyAt = Math.min(at, note.sustainEndAt);
+    const dt = Math.min(
+      0.1,
+      Math.max(0, (whammyAt - (note.whammyAt ?? note.sustainStartedAt)) / 1000),
+    );
+    note.whammyAt = Math.max(note.whammyAt ?? 0, whammyAt);
+    const before = note.whammyCredit || 0;
+    note.whammyCredit = before + state.whammy * dt;
+    const whammyBonus = (seconds) =>
+      getWebHeroSustainBonus(
+        seconds * WHAMMY_RATE,
+        note.holdMultiplier,
+        state.scoreMultiplier,
+      );
+    state.score += whammyBonus(note.whammyCredit) - whammyBonus(before);
+    if (
+      state.whammy &&
+      !state.practiceRange &&
+      note.starPowerPhrase !== undefined
+    ) {
+      const phrase = state.starPowerPhrases.find(
+        (item) => item.id === note.starPowerPhrase,
+      );
+      if (phrase && !phrase.failed)
+        state.starPowerCharge = Math.min(
+          100,
+          state.starPowerCharge + state.whammy * dt * WHAMMY_SP_PER_SECOND,
+        );
+    }
     return heldSeconds;
   }
 
@@ -1475,6 +1694,7 @@ export function initWebHero(socket = null) {
 
   function strum() {
     if (!state.running || state.paused || state.ending) return;
+    if (autoStrumInput.checked) return;
     logAction("input.strum");
     const now = performance.now();
     if (state.longPauses.some((p) => now >= p.startAt && now < p.endAt)) return;
@@ -1487,17 +1707,20 @@ export function initWebHero(socket = null) {
   // HOPO (chaîne en cours) et TAP : validés par une frette pressée, sans strum.
   function tryFretHit(now) {
     if (!state.running || state.paused || state.ending) return;
-    const group = findGuitarGroup(state.notes, now);
+    const autoStrum = autoStrumInput.checked;
+    // Auto-strum : dès que la note entre dans la hitzone, pas seulement à l'instant exact.
+    const group = findGuitarGroup(
+      state.notes,
+      now,
+      autoStrum ? Math.max(GUITAR_WINDOW, state.hitZoneMs || 0) : GUITAR_WINDOW,
+    );
     if (!group || !fretsMatch(group.lanes, getHeldLanes())) return;
     if (
       state.lastFretAt > state.lastHitAt &&
       canFretHit(group.type, state.combo)
     ) {
       hitGuitarGroup(group, now);
-    } else if (
-      autoStrumInput.checked &&
-      group.notes.every((note) => now >= note.hitAt)
-    ) {
+    } else if (autoStrum) {
       logAction("input.strum", { auto: true });
       hitGuitarGroup(group, now);
     }
@@ -1864,6 +2087,22 @@ export function initWebHero(socket = null) {
       ),
     );
     practiceStartSectionSelect.value = "-1";
+    const savedSections = savedSettings.practiceSections;
+    if (savedSections?.chart === state.chartTitle) {
+      if (
+        [...practiceStartSectionSelect.options].some(
+          (o) => o.value === savedSections.start,
+        )
+      )
+        practiceStartSectionSelect.value = savedSections.start;
+      updatePracticeEndSections();
+      if (
+        [...practiceEndSectionSelect.options].some(
+          (o) => o.value === savedSections.end,
+        )
+      )
+        practiceEndSectionSelect.value = savedSections.end;
+    }
     updatePracticeEndSections();
     practiceStartSectionSelect.disabled = !practiceInput.checked;
     practiceEndSectionSelect.disabled = !practiceInput.checked;
@@ -2024,6 +2263,7 @@ export function initWebHero(socket = null) {
       state.chart = chart;
       state.chartTitle = songName;
       audioBuffers = decodedAudio;
+      audioNames = audioFiles.map(({ name }) => name);
       savedChartRecord = null;
       lastChartId = null;
       storageWarning = "";
@@ -2158,6 +2398,51 @@ export function initWebHero(socket = null) {
       logAction("input.controller.learn.started", { lane });
     });
   });
+  // Axes analogiques : whammy (bonus + animation) et tilt (Star Power). Sens et repos appris.
+  const AXES = ["whammy", "tilt"];
+  const axisCfg = {
+    whammy: { axis: 2, dir: 1 },
+    tilt: { axis: null, dir: 1 },
+    deadzone: 10,
+    threshold: 60,
+    ...JSON.parse(localStorage.getItem("web-hero-axes") || "{}"),
+  };
+  const axisEls = [...document.querySelectorAll(".web-hero-axis")];
+  let axisLearn = null;
+  let axisBase = null;
+  let tiltWasOn = false;
+  const refreshAxisLabels = () =>
+    axisEls.forEach((el, i) => {
+      const { axis } = axisCfg[AXES[i]];
+      el.textContent =
+        axisLearn === AXES[i] ? "…" : axis === null ? "—" : `A${axis}`;
+    });
+  axisEls.forEach((el, i) =>
+    el.addEventListener("click", () => {
+      const name = AXES[i];
+      if (axisLearn === name) {
+        axisCfg[name] = { axis: null, dir: 1 };
+        localStorage.setItem("web-hero-axes", JSON.stringify(axisCfg));
+        axisLearn = null;
+      } else {
+        axisLearn = name;
+        axisBase = null;
+      }
+      refreshAxisLabels();
+    }),
+  );
+  refreshAxisLabels();
+  for (const [id, key] of [
+    ["web-hero-whammy-deadzone", "deadzone"],
+    ["web-hero-tilt-threshold", "threshold"],
+  ]) {
+    const input = document.getElementById(id);
+    input.value = axisCfg[key];
+    input.addEventListener("input", () => {
+      axisCfg[key] = Number(input.value);
+      localStorage.setItem("web-hero-axes", JSON.stringify(axisCfg));
+    });
+  }
   const padWasDown = new Set();
   function pollPads() {
     const pads = navigator.getGamepads?.() ?? [];
@@ -2167,6 +2452,43 @@ export function initWebHero(socket = null) {
     const axes = (pickPad(pads)?.axes ?? []).flatMap((v, i) =>
       Math.abs(v) > 0.5 ? [`A${i}`] : [],
     );
+    const padAxes = pickPad(pads)?.axes ?? [];
+    const learningAxis = axisLearn !== null;
+    if (learningAxis) {
+      axisBase ??= [...padAxes];
+      const i = padAxes.findIndex((v, k) => Math.abs(v - axisBase[k]) > 0.5);
+      if (i >= 0) {
+        axisCfg[axisLearn] = {
+          axis: i,
+          rest: axisBase[i],
+          dir: Math.sign(padAxes[i] - axisBase[i]),
+        };
+        localStorage.setItem("web-hero-axes", JSON.stringify(axisCfg));
+        axisLearn = null;
+        refreshAxisLabels();
+      }
+    }
+    const axisLevel = (name) => {
+      const cfg = axisCfg[name];
+      const value = cfg.axis === null ? undefined : padAxes[cfg.axis];
+      if (value === undefined) return 0;
+      cfg.rest ??= value;
+      return getAxisLevel(value, cfg.rest, cfg.dir);
+    };
+    state.whammy = learningAxis ? 0 : axisLevel("whammy");
+    if (state.whammy < axisCfg.deadzone / 100) state.whammy = 0;
+    const tiltOn = learningAxis || axisLevel("tilt") > axisCfg.threshold / 100;
+    if (tiltOn && !tiltWasOn && guitarMode) activateStarPower();
+    tiltWasOn = tiltOn;
+    if (whammyWet) {
+      const holding =
+        state.running && !state.paused && state.notes.some((n) => n.holding);
+      whammyWet.gain.setTargetAtTime(
+        holding ? state.whammy * WHAMMY_DISTORTION : 0,
+        audioContext.currentTime,
+        0.04,
+      );
+    }
     padDebugEl.title = pads
       .filter(Boolean)
       .map((p) => `${p.id} [${p.mapping}]`)

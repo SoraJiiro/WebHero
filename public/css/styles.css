@@ -73,7 +73,12 @@
   outline-offset: 3px;
 }
 .web-hero-key:focus-visible,
+.web-hero-axis-range {
+  width: 5rem;
+}
+
 .web-hero-pad:focus-visible,
+.web-hero-axis:focus-visible,
 .web-hero-strum-key:focus-visible,
 #web-hero-pause-key:focus-visible,
 #web-hero-star-power-key:focus-visible {
@@ -925,6 +930,7 @@ label i.fa-solid {
 }
 .web-hero-key,
 .web-hero-pad,
+.web-hero-axis,
 .web-hero-strum-key,
 #web-hero-pause-key,
 #web-hero-star-power-key {
@@ -1062,6 +1068,7 @@ label i.fa-solid {
 #web-hero-pause-key,
 #web-hero-star-power-key,
 .pause-map .web-hero-pad,
+.pause-map .web-hero-axis,
 .web-hero-strum-key {
   width: auto;
   min-width: 20px;
